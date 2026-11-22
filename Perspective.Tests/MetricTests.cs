@@ -39,6 +39,26 @@ public class MetricTests
         Assert.Null(perpendicular);
     }
 
+    [Fact]
+    public void AngleHelpers_CosineAndDegrees()
+    {
+        var xAxis = (X: ExactScalar.FromInt(1), Y: ExactScalar.FromInt(0));
+        var diagonal = (X: ExactScalar.FromInt(1), Y: ExactScalar.FromInt(1));
+
+        var cosine = Metric.CosineAngle(xAxis, diagonal);
+        Assert.NotNull(cosine);
+        Assert.Equal(System.Math.Sqrt(2) / 2, cosine!.Value.Approx, 9);
+
+        var degrees = Metric.AngleDegrees(xAxis, diagonal);
+        Assert.NotNull(degrees);
+        Assert.Equal(45.0, degrees!.Value, 9);
+
+        // 垂直：cos=0，角度 90°
+        var yAxis = (X: ExactScalar.FromInt(0), Y: ExactScalar.FromInt(1));
+        Assert.Equal(0.0, Metric.CosineAngle(xAxis, yAxis)!.Value.Approx, 9);
+        Assert.Equal(90.0, Metric.AngleDegrees(xAxis, yAxis)!.Value, 9);
+    }
+
     // ---------- 2022 新高考Ⅰ 21 ----------
     private static Conic Hyperbola => Conic.Hyperbola(ExactScalar.FromFormula("sqrt(2)"), 1);
     private static HPoint A => HPoint.FromCartesian(2, 1);

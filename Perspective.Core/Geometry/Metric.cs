@@ -75,6 +75,42 @@ public static class Metric
         return cross / dot;
     }
 
+    /// <summary>两向量夹角的余弦（精确，含根号；零向量返回 null）。</summary>
+    public static ExactScalar? CosineAngle(
+        (ExactScalar X, ExactScalar Y) u,
+        (ExactScalar X, ExactScalar Y) v)
+    {
+        var dot = u.X * v.X + u.Y * v.Y;
+        var normU2 = u.X * u.X + u.Y * u.Y;
+        var normV2 = v.X * v.X + v.Y * v.Y;
+        if (normU2.VerifyStrictZero() == StrictResult.StrictlyTrue) return null;
+        if (normV2.VerifyStrictZero() == StrictResult.StrictlyTrue) return null;
+
+        return dot / (ExactScalar.Sqrt(normU2) * ExactScalar.Sqrt(normV2));
+    }
+
+    /// <summary>两向量夹角的弧度（数值；atan2(|cross|, dot)，范围 [0, π]）。</summary>
+    public static double? AngleRadians(
+        (ExactScalar X, ExactScalar Y) u,
+        (ExactScalar X, ExactScalar Y) v)
+    {
+        var cross = u.X * v.Y - u.Y * v.X;
+        var dot = u.X * v.X + u.Y * v.Y;
+        if (!double.IsFinite(cross.Approx) || !double.IsFinite(dot.Approx)) return null;
+        if (u.X.VerifyStrictZero() == StrictResult.StrictlyTrue &&
+            u.Y.VerifyStrictZero() == StrictResult.StrictlyTrue) return null;
+        if (v.X.VerifyStrictZero() == StrictResult.StrictlyTrue &&
+            v.Y.VerifyStrictZero() == StrictResult.StrictlyTrue) return null;
+
+        return System.Math.Atan2(System.Math.Abs(cross.Approx), dot.Approx);
+    }
+
+    /// <summary>两向量夹角的度数（数值）。</summary>
+    public static double? AngleDegrees(
+        (ExactScalar X, ExactScalar Y) u,
+        (ExactScalar X, ExactScalar Y) v) =>
+        AngleRadians(u, v) is { } radians ? radians * 180.0 / System.Math.PI : null;
+
     /// <summary>三角形面积的两倍（= |(B−A) × (C−A)|），精确无根号。</summary>
     public static ExactScalar TriangleArea2(HPoint a, HPoint b, HPoint c)
     {
