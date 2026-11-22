@@ -1,0 +1,80 @@
+# 事实与定理总表（Fact & Theorem Catalog）
+
+本页是**单一出处**：所有事实类型（Fact）与推理规则（Theorem）的清单、前提/结论、视角等级、
+以及已知缺口。改代码时请同步本页。
+
+## 0. 总原则
+
+| 原则 | 说明 |
+|---|---|
+| 事实 append-only | 只增不改；id 绑定对象，值等价去重 |
+| 类型即查询 | 每条事实登记进对应类型视图与 id 索引（`PointsOn`/`LinesThrough`/…） |
+| 幂集事实规范化 | 共线/共点按**排序三元组**去重，按"对"索引第三元 |
+| 辅助点隔离 | 规则生成的 `AUX:` 点不参与组合枚举（`structural: false`） |
+| 视角门控 | 规则有 `RequiredLevel`；当前视角更"窄"（数值更小）时规则不激活 |
+| 结构化证明 | 规则只记录 `Derivation(ruleId, fact, premises)`，文本由 `ProofNarrator` 渲染 |
+| 黑箱隔离 | 外部判定器结论记为 `OracleStep`，只诚实转述，不伪造推导 |
+
+## 1. 事实类型（当前 11 种）
+
+| 事实 | 字段 | 含义 | 等级 | 检索/去重 |
+|---|---|---|---|---|
+| `OnLineFact` | PointId, LineId | 点在直线上 | — | 点→线、线→点索引 |
+| `OnConicFact` | PointId, ConicId | 点在圆锥曲线上 | — | 曲线→点索引 |
+| `TangentFact` | LineId, ConicId, TouchPointId | 直线切曲线于切点 | Projective | 线→曲线 |
+| `PolarOfFact` | LineId, PoleId, ConicId | 直线是极点的极线 | Projective | 极点→线索引 |
+| `CenterOfConicFact` | PointId, ConicId | 曲线中心 | Affine | 曲线→中心 |
+| `MidpointFact` | MidId, AId, BId | 中点是线段中点 | Affine | 单 id |
+| `HarmonicFact` | AId, BId, CId, DId | (A,B;C,D) = −1 | Projective | 类型视图 |
+| `CollinearFact` | P1Id, P2Id, P3Id | 三点共线 | Projective | **排序三元组** + 对索引 |
+| `ConcurrentFact` | L1Id, L2Id, L3Id | 三线共点 | Projective | **排序三元组** + 对索引 |
+| `ConjugateDirectionsFact` | Line1Id, Line2Id, ConicId | 两方向关于二次部分共轭 | Affine | 类型视图 |
+| `ConstantSlopeProductFact` | Line1Id, Line2Id, Value | 斜率积为定值 | Affine | 类型视图 |
+
+## 2. 定理规则（当前 11 条）
+
+| # | 规则 | 前提 | 结论 | 等级 | 说明 |
+|---|---|---|---|---|---|
+| 1 | 切点弦极线 | 两条切线、Q 在两线上 | `PolarOfFact(切点弦, Q)` | Projective | 切点必须在曲线上 |
+| 2 | La Hire 互反 | 两条极线、Q 在 P 的极线上 | `OnLineFact(P, Q的极线)` | Projective | 配极对称性 |
+| 3 | 极点极线调和束 | 极线、割线、割线与极线交点、两曲线交点 | `HarmonicFact` | Projective | 严格回验交比 |
+| 4 | 点差法中点斜率积 | 中心、中点、两点在曲线上 | `ConjugateDirectionsFact` / `ConstantSlopeProductFact` | Affine | 射影不保中点/斜率 |
+| 5 | 极线基本定理 | 点在曲线上 + 其极线 | `TangentFact` | Projective | 曲线上点的极线即切线 |
+| 6 | 共轭直径平分弦 | 共轭方向、弦的两端在曲线上 | `MidpointFact` | Affine | |
+| 7 | 同线三点共线 | 三点在同一直线上 | `CollinearFact` | Projective | 平凡但补链 |
+| 8 | 同点三线共点 | 三线过同一点 | `ConcurrentFact` | Projective | 平凡但补链 |
+| 9 | Pascal | 六点内接同一非退化曲线 | `CollinearFact`（对边交点） | Projective | 组合型，有成本闸 |
+| 10 | 完全四点形调和性 | 四点为一般位置 | 6 条 `HarmonicFact` | Projective | 组合型，有成本闸 |
+| 11 | Brianchon | 六条切线切同一非退化曲线 | `ConcurrentFact`（主对角线） | Projective | Pascal 对偶 |
+
+## 3. 已知缺口（按优先级）
+
+### 3.1 度量/角度/比例类事实（缺）
+
+| 计划事实 | 含义 | 等级 | 注意 |
+|---|---|---|---|
+| `ParallelFact` | 两线平行 | Affine | 已在 `ProofJudge` 注释中标记为缺口 |
+| `PerpendicularFact` | 两线垂直 | Similarity | 同上 |
+| `AngleEqualFact` | 有向角 ∠ABC ≡ ∠DEF (mod π) | Similarity | 需按 mod π 规范化，否则无法传递 |
+| `SegmentRatioFact` | \|AB\|/\|CD\| = r | Similarity | 长度比是相似不变量，不是仿射不变量 |
+| `AreaRatioFact` | S(ABC)/S(DEF) = r | Affine | 面积比是仿射不变量（行列式比） |
+| `CrossRatioFact` | (A,B;C,D) = r | Projective | `HarmonicFact` 是其 r=−1 特例；可考虑统一 |
+
+配套规则（后续）：平行/垂直传递、角相等传递（含 mod π 代数）、相似三角形→比例、
+面积比公式、交比链式传递。
+
+### 3.2 能力边界（非事实缺口）
+
+- 量词交替（覆盖 ∃∀/∀∃）只做了"候选 + 神谕闭合"的一维/有理情形；
+- 构造搜索（辅助线）未做；
+- 超越函数、实分支/弧段、一般不等式组未做。
+
+## 4. 几何化简 → 代数闭合（纪律）
+
+**先消元，再计算**（浙江 2022-21(ⅱ) 的教训）：
+
+1. **几何化简**：用射影/仿射不变量（线对、极点极线、交比、中点、共轭方向）把构形压成对称量；
+2. **降维无根号**：`Conic.RestrictToLine` / `IntersectionChordLengthSquared` 用韦达定理替代显式开方；
+3. **代数闭合**：`ExtremumSolver`（一维/有理目标）+ `IAlgebraicOracle`（Z3 判可满足性）。
+
+反例：显式求 A、B 的根号坐标再算交点，表达式复杂度 3511；换线对后 19。

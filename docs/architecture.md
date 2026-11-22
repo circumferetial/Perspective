@@ -129,6 +129,8 @@
 
 ## 5. 事实模型
 
+> 完整的事实/定理清单见 [facts-theorems.md](facts-theorems.md)（单一出处）。
+
 - 事实用 `record` 以 ID 绑定，天然值等价去重；
 - 唯一写入入口 `FactBase.AddFact`，同时维护按类型视图与按 id 索引；
 - 规则用声明式查询表达前提（`LinesThrough`、`PointsOn`、`HasOnConic` 等），
