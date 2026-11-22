@@ -68,6 +68,15 @@ public abstract record Statement
 
     public static Statement Not(Statement body) => new NotStatement(body);
 
+    /// <summary>
+    /// 蕴含：前提合取 → 结论。用于"题目给出的条件 ⇒ 待证结论"（Horn 形）。
+    /// </summary>
+    public static Statement Implies(IReadOnlyList<Statement> premises, Statement conclusion) =>
+        new ImplicationStatement(premises, conclusion);
+
+    public static Statement Implies(Statement conclusion, params Statement[] premises) =>
+        Implies(premises, conclusion);
+
     // ----- 量词 -----
     public static Statement ForAll(IReadOnlyList<string> variables, Statement body) =>
         new QuantifiedStatement(QuantifierKind.ForAll, variables, body);
@@ -90,6 +99,11 @@ public sealed record JunctionStatement(bool IsAnd, IReadOnlyList<Statement> Item
 
 /// <summary>否定。</summary>
 public sealed record NotStatement(Statement Body) : Statement;
+
+/// <summary>蕴含：所有前提成立 ⇒ 结论成立。</summary>
+public sealed record ImplicationStatement(
+    IReadOnlyList<Statement> Premises,
+    Statement Conclusion) : Statement;
 
 /// <summary>量词节点：kind 个变量 + 体。</summary>
 public sealed record QuantifiedStatement(

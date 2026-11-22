@@ -99,6 +99,7 @@ public static class ProblemSpec
         QuantifiedStatement => true,
         JunctionStatement j => j.Items.Any(ContainsQuantifier),
         NotStatement n => ContainsQuantifier(n.Body),
+        ImplicationStatement i => i.Premises.Any(ContainsQuantifier) || ContainsQuantifier(i.Conclusion),
         _ => false
     };
 
@@ -197,9 +198,21 @@ public static class ProblemSpec
             ? KleeneAnd(junction.Items.Select(EvaluateMatrix))
             : KleeneOr(junction.Items.Select(EvaluateMatrix)),
         NotStatement not => Negate(EvaluateMatrix(not.Body)),
+        ImplicationStatement implication => EvaluateImplication(implication),
         QuantifiedStatement => TruthValue.Unknown,
         _ => TruthValue.Unknown
     };
+
+    private static TruthValue EvaluateImplication(ImplicationStatement implication)
+    {
+        var premises = implication.Premises.Select(EvaluateMatrix).ToList();
+        var conclusion = EvaluateMatrix(implication.Conclusion);
+
+        if (premises.Any(p => p == TruthValue.False)) return TruthValue.True;      // 前提不成立 => 蕴含为真
+        if (conclusion == TruthValue.True) return TruthValue.True;
+        if (premises.All(p => p == TruthValue.True)) return conclusion;            // 前提全真 => 取决于结论
+        return TruthValue.Unknown;
+    }
 
     private static TruthValue EvaluateRelation(RelationStatement relation)
     {
@@ -268,4 +281,37 @@ public static class ProblemSpec
         TruthValue.False => TruthValue.True,
         _ => TruthValue.Unknown
     };
+
+    /// <summary>
+    /// 【题目现场约束】检查"给定假设下结论是否成立"：`H₁ ∧ … ∧ Hₙ ⇒ C`。
+    /// <para>
+    /// 归结为反正例检查：`∃vars (H ∧ ¬C)` 不可满足 ⇒ 结论成立。
+    /// 假设与结论都是**关系对象（表达式 + 关系符号）**，而不是 predicate/delegate——
+    /// 因此它们可以被代数地代入、消元、交给判定器。
+    /// </para>
+    /// </summary>
+    public static EntailmentReport CheckEntailment(
+        IAlgebraicOracle oracle,
+        IReadOnlyList<string> variables,
+        IReadOnlyList<RelationStatement> hypotheses,
+        RelationStatement conclusion)
+    {
+        var verdict = oracle.DecideUniversal(variables, hypotheses, conclusion);
+        var truth = verdict.Kind switch
+        {
+            OracleVerdictKind.Unsat => TruthValue.True,
+            OracleVerdictKind.Sat => TruthValue.False,
+            _ => TruthValue.Unknown
+        };
+        string explanation = verdict.Kind switch
+        {
+            OracleVerdictKind.Unsat => "在给定约束下未找到反例，结论成立",
+            OracleVerdictKind.Sat => "找到反例（约束满足但结论不成立）：" + verdict.Model,
+            _ => "无法判定：" + (verdict.Reason ?? "unknown")
+        };
+        return new EntailmentReport(truth, verdict, explanation);
+    }
 }
+
+/// <summary>假设 ⇒ 结论的判定报告（三值 + 判定器原始结论）。</summary>
+public sealed record EntailmentReport(TruthValue Truth, OracleVerdict Verdict, string Explanation);
