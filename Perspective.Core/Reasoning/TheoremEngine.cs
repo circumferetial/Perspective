@@ -4,34 +4,66 @@ using Perspective.Core.Math;
 namespace Perspective.Core.Reasoning;
 
 /// <summary>
-/// 定理规则的 static abstract 契约：零堆内存分配，编译期绑定变换等级
+/// 定理规则的 static abstract 契约：零堆内存分配，编译期绑定变换等级。
+/// <para>
+/// <see cref="ConclusionTypes"/> 与 <see cref="PremiseTypes"/> 是**目标导向推演**的元数据：
+/// 引擎从待证结论的事实类型出发，反向闭包出需要激活的规则子集（类型级反向链），
+/// 避免"所有规则对所有事实"的广度爆炸。规则本身仍只暴露 <see cref="Apply"/>，
+/// 因此不需要为反向链另写一份推导逻辑。
+/// </para>
 /// </summary>
 public interface IFactRule<TSelf> where TSelf : IFactRule<TSelf>
 {
     static abstract string Title { get; }
     static abstract TransformLevel RequiredLevel { get; }
+
+    /// <summary>本规则可能产出的事实类型（用于反向链的"能证明什么"）。</summary>
+    static abstract Type[] ConclusionTypes { get; }
+
+    /// <summary>本规则依赖的事实类型（用于反向链的"还需要什么"）。</summary>
+    static abstract Type[] PremiseTypes { get; }
+
     static abstract int Apply(FactBase facts);
 }
 
 /// <summary>
-/// 前向推演引擎：不断用已有事实匹配定理前提，推出新事实，直到推不动为止（不动点）
+/// 目标导向推演的结果。
+/// </summary>
+public readonly record struct ProofAttempt(
+    bool Proved,
+    string? Trace,
+    int RulesActivated,
+    int FactsBefore,
+    int FactsAfter);
+
+/// <summary>
+/// 前向推演引擎：既能"全量跑到不动点"（数据驱动 BFS），也能"从结论反推规则子集"
+/// （类型级反向链，目标导向）。两者共用同一批规则与同一套严通道纪律。
 /// </summary>
 public sealed class TheoremEngine
 {
-    private readonly List<(string Title, TransformLevel Level, Func<FactBase, int> Run)> _rules = [];
+    private readonly List<(string Title, TransformLevel Level, Func<FactBase, int> Run,
+        Type[] Conclusions, Type[] Premises)> _rules = [];
 
     public TheoremEngine Register<TRule>() where TRule : IFactRule<TRule>
     {
-        _rules.Add((TRule.Title, TRule.RequiredLevel, TRule.Apply));
+        _rules.Add((TRule.Title, TRule.RequiredLevel, TRule.Apply,
+            TRule.ConclusionTypes, TRule.PremiseTypes));
         return this;
     }
 
+    /// <summary>已注册规则数。</summary>
+    public int RuleCount => _rules.Count;
+
+    /// <summary>
+    /// 数据驱动推演：所有规则反复执行到不动点（广度搜索，可能产生无关事实）。
+    /// </summary>
     public void RunToFixedPoint(FactBase facts, int maxPasses = 10)
     {
         for (int pass = 1; pass <= maxPasses; pass++)
         {
             int addedInPass = 0;
-            foreach (var (title, reqLevel, run) in _rules)
+            foreach (var (title, reqLevel, run, _, _) in _rules)
             {
                 // 前提守卫 1：当前视角必须满足该定理的埃尔朗根不变性级别！
                 if (facts.CurrentLevel > reqLevel)
@@ -42,6 +74,60 @@ public sealed class TheoremEngine
 
             if (addedInPass == 0) break; // 没有新结论产生，推理完成！
         }
+    }
+
+    /// <summary>
+    /// **目标导向推演**：从待证结论的事实类型出发，反向闭包出可能产出它的规则集合，
+    /// 只激活这些规则（及其前提类型的产出规则），推到不动点后检查结论是否命中。
+    /// <para>
+    /// 【为什么这样是对的】反向闭包只可能**多**激活规则（类型粒度比实例粒度粗），
+    /// 不会漏掉能产出目标类型的规则；而每条规则内部仍做严通道验证，
+    /// 所以结论命中即可信。它是完备性的保守近似，不是启发式剪枝。
+    /// </para>
+    /// </summary>
+    public ProofAttempt Prove(FactBase facts, Type targetFactType, Func<FactBase, string?> traceOf, int maxPasses = 10)
+    {
+        int before = facts.Facts.Count;
+
+        // 类型级反向闭包：目标类型 -> 产出它的规则 -> 其前提类型 -> ...
+        var neededTypes = new HashSet<Type>();
+        var selected = new List<int>();
+        var selectedSet = new HashSet<int>();
+        var queue = new Queue<Type>();
+        queue.Enqueue(targetFactType);
+        neededTypes.Add(targetFactType);
+
+        while (queue.Count > 0)
+        {
+            var need = queue.Dequeue();
+            for (int i = 0; i < _rules.Count; i++)
+            {
+                if (selectedSet.Contains(i)) continue;
+                if (!_rules[i].Conclusions.Contains(need)) continue;
+
+                selectedSet.Add(i);
+                selected.Add(i);
+                foreach (var prem in _rules[i].Premises)
+                    if (neededTypes.Add(prem))
+                        queue.Enqueue(prem);
+            }
+        }
+
+        // 只跑被选中的规则
+        for (int pass = 1; pass <= maxPasses; pass++)
+        {
+            int addedInPass = 0;
+            foreach (int i in selected)
+            {
+                var (_, reqLevel, run, _, _) = _rules[i];
+                if (facts.CurrentLevel > reqLevel) continue;
+                addedInPass += run(facts);
+            }
+            if (addedInPass == 0) break;
+        }
+
+        var trace = traceOf(facts);
+        return new ProofAttempt(trace is not null, trace, selected.Count, before, facts.Facts.Count);
     }
 }
 
@@ -63,6 +149,8 @@ public readonly struct ChordOfContactIsPolarRule : IFactRule<ChordOfContactIsPol
 {
     public static string Title => "切点弦极线定理";
     public static TransformLevel RequiredLevel => TransformLevel.Projective;
+    public static Type[] ConclusionTypes => [typeof(PolarOfFact)];
+    public static Type[] PremiseTypes => [typeof(TangentFact), typeof(OnLineFact)];
 
     public static int Apply(FactBase facts)
     {
@@ -129,6 +217,8 @@ public readonly struct PolePolarReciprocityRule : IFactRule<PolePolarReciprocity
 {
     public static string Title => "La Hire 极点极线互反定理";
     public static TransformLevel RequiredLevel => TransformLevel.Projective;
+    public static Type[] ConclusionTypes => [typeof(OnLineFact)];
+    public static Type[] PremiseTypes => [typeof(PolarOfFact), typeof(OnLineFact)];
 
     public static int Apply(FactBase facts)
     {
@@ -187,6 +277,8 @@ public readonly struct HarmonicPolarBundleRule : IFactRule<HarmonicPolarBundleRu
 {
     public static string Title => "极点极线调和点列定理";
     public static TransformLevel RequiredLevel => TransformLevel.Projective;
+    public static Type[] ConclusionTypes => [typeof(HarmonicFact)];
+    public static Type[] PremiseTypes => [typeof(PolarOfFact), typeof(OnLineFact), typeof(OnConicFact)];
 
     public static int Apply(FactBase facts)
     {
@@ -252,7 +344,9 @@ public readonly struct HarmonicPolarBundleRule : IFactRule<HarmonicPolarBundleRu
 public readonly struct ConicMidpointSlopeRule : IFactRule<ConicMidpointSlopeRule>
 {
     public static string Title => "点差法中点斜率积定理";
-    public static TransformLevel RequiredLevel => TransformLevel.Affine; // 射影视角不保中点与斜率积！
+    public static TransformLevel RequiredLevel => TransformLevel.Affine;
+    public static Type[] ConclusionTypes => [typeof(ConjugateDirectionsFact), typeof(ConstantSlopeProductFact)];
+    public static Type[] PremiseTypes => [typeof(CenterOfConicFact), typeof(MidpointFact), typeof(OnConicFact)]; // 射影视角不保中点与斜率积！
 
     public static int Apply(FactBase facts)
     {
@@ -341,6 +435,8 @@ public readonly struct PolarFundamentalRule : IFactRule<PolarFundamentalRule>
 {
     public static string Title => "极线基本定理";
     public static TransformLevel RequiredLevel => TransformLevel.Projective;
+    public static Type[] ConclusionTypes => [typeof(TangentFact)];
+    public static Type[] PremiseTypes => [typeof(OnConicFact), typeof(PolarOfFact)];
 
     public static int Apply(FactBase facts)
     {
@@ -382,6 +478,8 @@ public readonly struct ConjugateDiameterBisectsChordRule : IFactRule<ConjugateDi
 {
     public static string Title => "共轭直径平分弦定理";
     public static TransformLevel RequiredLevel => TransformLevel.Affine;
+    public static Type[] ConclusionTypes => [typeof(MidpointFact)];
+    public static Type[] PremiseTypes => [typeof(ConjugateDirectionsFact), typeof(OnLineFact), typeof(OnConicFact)];
 
     public static int Apply(FactBase facts)
     {
@@ -448,6 +546,8 @@ public readonly struct PascalRule : IFactRule<PascalRule>
 {
     public static string Title => "Pascal 内接六边形定理";
     public static TransformLevel RequiredLevel => TransformLevel.Projective;
+    public static Type[] ConclusionTypes => [typeof(CollinearFact)];
+    public static Type[] PremiseTypes => [typeof(OnConicFact)];
 
     /// <summary>单条曲线上参与组合的点数上限（控制组合数与符号验证成本）。</summary>
     private const int MaxPool = 8;
@@ -545,6 +645,8 @@ public readonly struct CompleteQuadrangleHarmonicRule : IFactRule<CompleteQuadra
 {
     public static string Title => "完全四点形的调和性";
     public static TransformLevel RequiredLevel => TransformLevel.Projective;
+    public static Type[] ConclusionTypes => [typeof(HarmonicFact)];
+    public static Type[] PremiseTypes => [];
 
     private const int MaxPool = 8;
 
@@ -702,6 +804,8 @@ public readonly struct BrianchonRule : IFactRule<BrianchonRule>
 {
     public static string Title => "Brianchon 外切六边形定理";
     public static TransformLevel RequiredLevel => TransformLevel.Projective;
+    public static Type[] ConclusionTypes => [typeof(ConcurrentFact)];
+    public static Type[] PremiseTypes => [typeof(TangentFact)];
 
     private const int MaxPool = 8;
 
@@ -805,6 +909,8 @@ public readonly struct CollinearFromCommonLineRule : IFactRule<CollinearFromComm
 {
     public static string Title => "同线三点共线";
     public static TransformLevel RequiredLevel => TransformLevel.Projective;
+    public static Type[] ConclusionTypes => [typeof(CollinearFact)];
+    public static Type[] PremiseTypes => [typeof(OnLineFact)];
 
     public static int Apply(FactBase facts)
     {
@@ -850,6 +956,8 @@ public readonly struct ConcurrentFromCommonPointRule : IFactRule<ConcurrentFromC
 {
     public static string Title => "同点三线共点";
     public static TransformLevel RequiredLevel => TransformLevel.Projective;
+    public static Type[] ConclusionTypes => [typeof(ConcurrentFact)];
+    public static Type[] PremiseTypes => [typeof(OnLineFact)];
 
     public static int Apply(FactBase facts)
     {

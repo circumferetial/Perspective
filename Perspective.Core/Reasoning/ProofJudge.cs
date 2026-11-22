@@ -90,8 +90,12 @@ public static class ProofJudge
                 $"视角不兼容：当前处于 {facts.CurrentLevel} 视角，而待证命题至少需要 {claim.RequiredLevel} 视角才有意义。");
         }
 
-        // 第 2 关：先让定理引擎推演到不动点（在不污染待证命题的前提下穷尽已知事实）
-        engine.RunToFixedPoint(facts);
+        // 第 2 关：目标导向推演——从待证结论的事实类型反推需要哪些规则（类型级反向链），
+        // 只激活相关规则，避免"所有规则对所有事实"的广度爆炸。
+        // 若该命题没有对应事实类型（如垂直/平行），则跳过推演，直接进入代数预言机。
+        var targetType = ClaimFactType(claim);
+        if (targetType is not null)
+            engine.Prove(facts, targetType, f => TryFindInFactBase(f, claim));
 
         // 第 3 关：检查待证命题是否已被定理库推演命中（逻辑证明路径）
         var logicalHit = TryFindInFactBase(facts, claim);
@@ -119,6 +123,20 @@ public static class ProofJudge
                 $"【无法严格判定】状态：{strictCheck}（可能使用了纯近似拖拽坐标，或含高阶复杂公式）。")
         };
     }
+
+    /// <summary>命题形态 → 对应事实类型（供目标导向推演反推规则子集）；无对应类型返回 null。</summary>
+    private static Type? ClaimFactType(GeoClaim claim) => claim switch
+    {
+        ClaimOnLine => typeof(OnLineFact),
+        ClaimOnConic => typeof(OnConicFact),
+        ClaimTangent => typeof(TangentFact),
+        ClaimPolarOf => typeof(PolarOfFact),
+        ClaimHarmonic => typeof(HarmonicFact),
+        ClaimCollinear => typeof(CollinearFact),
+        ClaimPerpendicular => null,   // 尚无 PerpendicularFact
+        ClaimParallel => null,        // 尚无 ParallelFact
+        _ => null
+    };
 
     private static string? TryFindInFactBase(FactBase facts, GeoClaim claim)
     {
