@@ -761,7 +761,11 @@ public readonly struct CompleteQuadrangleHarmonicRule : IFactRule<CompleteQuadra
                 // 数值预筛：交比明显不是 −1 的组合直接跳过（结论仍由严通道决定）
                 if (!HarmonicApprox(s.X, s.Y, s.G, S)) continue;
 
-                if (GeometryAudit.IsHarmonic(s.X, s.Y, s.G, S) != StrictResult.StrictlyTrue) continue;
+                // 交比严证：坐标级判定，按实体 id 缓存（同一构形在后续 pass 中不再重复验）
+                bool harmonic = facts.CachedCheck(
+                    $"CQH|{s.XId}|{s.YId}|{s.GId}|{sId}",
+                    () => GeometryAudit.IsHarmonic(s.X, s.Y, s.G, S) == StrictResult.StrictlyTrue);
+                if (!harmonic) continue;
 
                 EnsurePoint(facts, sId, S);
                 if (facts.AddDerivedFact(
@@ -823,7 +827,7 @@ public readonly struct CompleteQuadrangleHarmonicRule : IFactRule<CompleteQuadra
         if (System.Math.Abs(denom) < 1e-12) return true;   // 退化交比交给严通道
 
         double cr = (tc - 0.0) * (td - 1.0) / denom;
-        return System.Math.Abs(cr + 1.0) <= 1e-6;
+        return System.Math.Abs(cr + 1.0) <= 1e-9;
     }
 
     private static string EnsurePoint(FactBase facts, string id, HPoint p)

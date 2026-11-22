@@ -78,6 +78,31 @@ public sealed class FactBase
     public List<NonDegenerateAssumption> Assumptions { get; } = [];
 
     /// <summary>
+    /// 坐标级验证缓存（一次运行内有效）。
+    /// <para>
+    /// 【能缓存什么】只依赖坐标的判定：IsHarmonic、ContainsStrictly、Collinear、IsTangent…
+    /// 这类判定与事实库后来新增了什么无关，重复调用结果不变。
+    /// </para>
+    /// <para>
+    /// 【绝不能缓存什么】依赖"事实是否存在"的判定（如"找不到某条极线"）——
+    /// 事实库是 append-only，后续规则可能补上该事实，缓存失败会导致漏推。
+    /// </para>
+    /// </summary>
+    private readonly Dictionary<string, bool> _checkCache = [];
+
+    /// <summary>带缓存的布尔判定：同一 key 只计算一次（仅用于坐标级判定，见类注释）。</summary>
+    public bool CachedCheck(string key, Func<bool> compute)
+    {
+        if (_checkCache.TryGetValue(key, out bool cached)) return cached;
+        bool result = compute();
+        _checkCache[key] = result;
+        return result;
+    }
+
+    /// <summary>缓存条目数（诊断/基准用）。</summary>
+    public int CachedCheckCount => _checkCache.Count;
+
+    /// <summary>
     /// 登记一条"某表达式不为零"的非退化假设。
     /// 【一致性检查】若该表达式**恒为零**，说明在这些对象下假设必然失败（构形退化），
     /// 返回 false 并不登记。
