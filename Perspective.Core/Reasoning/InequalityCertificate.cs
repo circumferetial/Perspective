@@ -13,7 +13,8 @@ namespace Perspective.Core.Reasoning;
 public sealed record InequalityCase(
     IReadOnlyList<RelationStatement> Guards,
     ExactScalar Polynomial,
-    string Description);
+    string Description,
+    bool Strict = false);
 
 public sealed record InequalityCertificateResult(
     bool Verified,
@@ -37,9 +38,11 @@ public static class InequalityCertificateVerifier
         var failed = new List<string>();
         foreach (var @case in cases)
         {
+            // 非严格分支检查 "多项式 < 0" 不可满足；严格分支检查 "多项式 ≤ 0" 不可满足
+            var opposing = @case.Strict ? RelationKind.LessOrEqual : RelationKind.LessThan;
             var constraints = new List<RelationStatement>(@case.Guards)
             {
-                new(RelationKind.LessThan, @case.Polynomial, ExactScalar.FromInt(0))
+                new(opposing, @case.Polynomial, ExactScalar.FromInt(0))
             };
 
             var verdict = oracle.DecideExists(variables, constraints);
@@ -60,7 +63,7 @@ public static class InequalityCertificateVerifier
 
         return failed.Count == 0
             ? new(true, [],
-                $"{cases.Count} 个分支全部通过反例检查（不存在「守卫成立且多项式 < 0」的实点）")
+                $"{cases.Count} 个分支全部通过反例检查（不存在违规点）")
             : new(false, failed,
                 $"{failed.Count}/{cases.Count} 个分支未通过：{string.Join("；", failed)}");
     }
