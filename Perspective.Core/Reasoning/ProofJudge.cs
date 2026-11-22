@@ -95,15 +95,15 @@ public static class ProofJudge
         // 若该命题没有对应事实类型（如垂直/平行），则跳过推演，直接进入代数预言机。
         var targetType = ClaimFactType(claim);
         if (targetType is not null)
-            engine.Prove(facts, targetType, f => TryFindInFactBase(f, claim));
+            engine.Prove(facts, targetType, f => TryFindInFactBase(f, claim) is null ? null : "命中");
 
         // 第 3 关：检查待证命题是否已被定理库推演命中（逻辑证明路径）
-        var logicalHit = TryFindInFactBase(facts, claim);
-        if (logicalHit is not null)
+        var derivation = TryFindInFactBase(facts, claim);
+        if (derivation is not null)
         {
             return new JudgmentReport(
                 ClaimVerdict.ProvedByTheoremChain,
-                $"【定理链已证】{logicalHit}");
+                $"【定理链已证】{ProofNarrator.Render(facts, derivation)}");
         }
 
         // 第 4 关：定理库没推出来，启动“代数严通道预言机”直接核算真伪！
@@ -138,7 +138,7 @@ public static class ProofJudge
         _ => null
     };
 
-    private static string? TryFindInFactBase(FactBase facts, GeoClaim claim)
+    private static Derivation? TryFindInFactBase(FactBase facts, GeoClaim claim)
     {
         // 用事实库的类型视图做声明式匹配（不再对全表 OfType 扫描）
         GeoFact? matched = claim switch
@@ -160,7 +160,10 @@ public static class ProofJudge
         };
 
         if (matched is null) return null;
-        return facts.DerivationLog.FirstOrDefault(x => x.Fact == matched).Trace ?? "来自初始前提事实";
+
+        // 命中事实：返回其结构化推导记录；初始前提没有记录，给一条 AdHoc 记录
+        return facts.DerivationLog.FirstOrDefault(x => x.Fact == matched)
+            ?? new Derivation(RuleIds.AdHoc, matched, [], "来自初始前提事实");
     }
 
     private static StrictResult VerifyByAlgebraOracle(FactBase facts, GeoClaim claim)

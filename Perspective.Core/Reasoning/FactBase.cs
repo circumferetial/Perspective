@@ -65,7 +65,8 @@ public sealed class FactBase
     public Dictionary<string, Conic> Conics { get; } = [];
 
     public HashSet<GeoFact> Facts { get; } = [];
-    public List<(GeoFact Fact, string Trace)> DerivationLog { get; } = [];
+    /// <summary>结构化证明记录（事实 ← 规则 ← 前提）。解释文本由 ProofNarrator 渲染。</summary>
+    public List<Derivation> DerivationLog { get; } = [];
 
     // --- 按类型的只读视图（由 AddFact 增量维护） ---
     private readonly List<OnLineFact> _onLines = [];
@@ -162,12 +163,22 @@ public sealed class FactBase
     /// <summary>已有曲线 id（供规则枚举"每条曲线上的点"）。</summary>
     public IEnumerable<string> ConicIdsWithPoints => _pointsOnConic.Keys;
 
-    /// <summary>注册一条新事实（若已存在则忽略；返回 true 表示推出了新知识）。</summary>
-    public bool AddFact(GeoFact fact, string trace)
+    /// <summary>注册一条新事实（无规则出处：初始条件 / 辅助连线；解释由 Note 承担）。</summary>
+    public bool AddFact(GeoFact fact, string note) =>
+        AddFactCore(fact, new Derivation(RuleIds.AdHoc, fact, [], note));
+
+    /// <summary>
+    /// 注册一条由规则推出的事实：**只记录结构化前提**（规则 id + 前提事实），不携带自然语言。
+    /// 解释文本由 <see cref="ProofNarrator"/> 统一渲染。
+    /// </summary>
+    public bool AddFact(GeoFact fact, string ruleId, params GeoFact[] premises) =>
+        AddFactCore(fact, new Derivation(ruleId, fact, premises));
+
+    private bool AddFactCore(GeoFact fact, Derivation derivation)
     {
         fact = Canonicalize(fact);
         if (!Facts.Add(fact)) return false;
-        DerivationLog.Add((fact, trace));
+        DerivationLog.Add(derivation with { Fact = fact });
         Index(fact);
         return true;
     }

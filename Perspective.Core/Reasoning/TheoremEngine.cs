@@ -191,8 +191,12 @@ public readonly struct ChordOfContactIsPolarRule : IFactRule<ChordOfContactIsPol
                         polarQ.ContainsStrictly(ptB) != StrictResult.StrictlyTrue) continue;
 
                     string chordId = facts.GetOrCreateLine(t1.TouchPointId, t2.TouchPointId);
-                    if (facts.AddFact(new PolarOfFact(chordId, qId, t1.ConicId),
-                        $"[{Title}] 因 {t1.LineId}, {t2.LineId} 相切且交于 {qId} => 切点弦 {chordId} 即为 {qId} 的极线"))
+                    if (facts.AddFact(
+                            new PolarOfFact(chordId, qId, t1.ConicId),
+                            RuleIds.ChordOfContactIsPolar,
+                            t1, t2,
+                            new OnLineFact(qId, t1.LineId),
+                            new OnLineFact(qId, t2.LineId)))
                         count++;
                 }
             }
@@ -250,8 +254,11 @@ public readonly struct PolePolarReciprocityRule : IFactRule<PolePolarReciprocity
                 var ptP = facts.Points[pFact.PoleId];
                 if (lineQ.ContainsStrictly(ptP) != StrictResult.StrictlyTrue) continue;
 
-                if (facts.AddFact(new OnLineFact(pFact.PoleId, qFact.LineId),
-                    $"[{Title}] 因 {qFact.PoleId} 在 {pFact.PoleId} 的极线 {pFact.LineId} 上 => {qFact.PoleId} 的极线 {qFact.LineId} 恒过定点 {pFact.PoleId}！"))
+                if (facts.AddFact(
+                        new OnLineFact(pFact.PoleId, qFact.LineId),
+                        RuleIds.PolePolarReciprocity,
+                        pFact, qFact,
+                        new OnLineFact(qFact.PoleId, pFact.LineId)))
                     count++;
             }
         }
@@ -606,8 +613,12 @@ public readonly struct PascalRule : IFactRule<PascalRule>
                 string qId = EnsurePoint(facts, $"AUX:PASCAL[{a2}{a3}|{a5}{a6}]", q);
                 string rId = EnsurePoint(facts, $"AUX:PASCAL[{a3}{a4}|{a6}{a1}]", r);
 
-                if (facts.AddFact(CollinearFact.Create(pId, qId, rId),
-                    $"[{Title}] 内接六边形 {a1}{a2}{a3}{a4}{a5}{a6} 于 {conicId}：对边交点 {pId},{qId},{rId} 共线"))
+                if (facts.AddFact(
+                        CollinearFact.Create(pId, qId, rId),
+                        RuleIds.Pascal,
+                        new OnConicFact(a1, conicId), new OnConicFact(a2, conicId),
+                        new OnConicFact(a3, conicId), new OnConicFact(a4, conicId),
+                        new OnConicFact(a5, conicId), new OnConicFact(a6, conicId)))
                     count++;
             }
         }
@@ -932,8 +943,12 @@ public readonly struct CollinearFromCommonLineRule : IFactRule<CollinearFromComm
                 // 严通道回验：坐标确实共线
                 if (PointTools.Collinear(a, b, c) != StrictResult.StrictlyTrue) continue;
 
-                if (facts.AddFact(CollinearFact.Create(pts[i], pts[j], pts[k]),
-                    $"[{Title}] {pts[i]}, {pts[j]}, {pts[k]} 同在直线 {lineId} 上 => 三点共线"))
+                if (facts.AddFact(
+                        CollinearFact.Create(pts[i], pts[j], pts[k]),
+                        RuleIds.CollinearFromCommonLine,
+                        new OnLineFact(pts[i], lineId),
+                        new OnLineFact(pts[j], lineId),
+                        new OnLineFact(pts[k], lineId)))
                     count++;
             }
         }
