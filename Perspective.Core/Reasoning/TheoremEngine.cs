@@ -685,6 +685,114 @@ public readonly struct CompleteQuadrangleHarmonicRule : IFactRule<CompleteQuadra
 }
 
 /// <summary>
+/// 命题 11：Brianchon 定理（外切六边形三主对角线共点）——Pascal 的射影对偶。
+/// 【前提】① 同一非退化圆锥曲线上有 6 条互异切线（TangentFact，且逐条用
+///         ConicTools.IsTangent 严通道回验）；② 按遍历顺序记相邻切线交点为顶点
+///         V₁ = T₁∩T₂, …, V₆ = T₆∩T₁；③ 三条主对角线 V₁V₄、V₂V₅、V₃V₆ 互异。
+/// 【结论】三条主对角线共点 → ConcurrentFact(d₁, d₂, d₃)。
+/// 【推导】Brianchon 是 Pascal 的对偶命题：把"点在曲线上"对偶为"线切于曲线"、
+///         "共线"对偶为"共点"。对自交外切六边形同样成立；顶点在无穷远
+///         （相邻切线平行）时结论依然成立（齐次意义下）。
+///         本规则对结论做严通道回验（两条对角线求交后 SameStrictly），不通过不写库。
+/// 【等级】Projective。
+/// 【实现说明】主对角线作为辅助直线登记（AUX: 前缀，id 含 6 条切线，保证不撞 id）；
+///         每条曲线最多取 8 条切线做组合。
+/// </summary>
+public readonly struct BrianchonRule : IFactRule<BrianchonRule>
+{
+    public static string Title => "Brianchon 外切六边形定理";
+    public static TransformLevel RequiredLevel => TransformLevel.Projective;
+
+    private const int MaxPool = 8;
+
+    public static int Apply(FactBase facts)
+    {
+        int count = 0;
+        if (facts.Tangents.Count < 6) return 0;
+
+        // 按曲线分组
+        foreach (var group in facts.Tangents.GroupBy(t => t.ConicId))
+        {
+            if (!facts.Conics.TryGetValue(group.Key, out var conic)) continue;
+            if (conic.Matrix.Determinant().VerifyStrictZero() == StrictResult.StrictlyTrue) continue;
+
+            // 严通道回验 + 线互异
+            var lines = new List<string>();
+            var seen = new List<HLine>();
+            foreach (var t in group)
+            {
+                if (lines.Count >= MaxPool) break;
+                if (!facts.Lines.TryGetValue(t.LineId, out var line)) continue;
+                if (ConicTools.IsTangent(conic, line) != StrictResult.StrictlyTrue) continue;
+                if (seen.Any(prev => LineTools.Same(prev, line) == StrictResult.StrictlyTrue)) continue;
+                seen.Add(line);
+                lines.Add(t.LineId);
+            }
+            if (lines.Count < 6) continue;
+
+            for (int i = 0; i < lines.Count - 5; i++)
+            for (int j = i + 1; j < lines.Count - 4; j++)
+            for (int k = j + 1; k < lines.Count - 3; k++)
+            for (int l = k + 1; l < lines.Count - 2; l++)
+            for (int m = l + 1; m < lines.Count - 1; m++)
+            for (int n = m + 1; n < lines.Count; n++)
+            {
+                var t = new[] { lines[i], lines[j], lines[k], lines[l], lines[m], lines[n] };
+                var h = t.Select(id => facts.Lines[id]).ToArray();
+
+                // 相邻切线交点：V₁ = T₁∩T₂, …, V₆ = T₆∩T₁
+                var v = new HPoint[6];
+                bool bad = false;
+                for (int s = 0; s < 6; s++)
+                {
+                    v[s] = HLine.Intersect(h[s], h[(s + 1) % 6]);
+                    if (IsZeroVector(v[s])) { bad = true; break; }
+                }
+                if (bad) continue;
+
+                // 三条主对角线 V₁V₄、V₂V₅、V₃V₆
+                var d1 = HLine.FromPoints(v[0], v[3]);
+                var d2 = HLine.FromPoints(v[1], v[4]);
+                var d3 = HLine.FromPoints(v[2], v[5]);
+                if (IsZeroLine(d1) || IsZeroLine(d2) || IsZeroLine(d3)) continue;
+                if (LineTools.Same(d1, d2) == StrictResult.StrictlyTrue
+                 || LineTools.Same(d1, d3) == StrictResult.StrictlyTrue
+                 || LineTools.Same(d2, d3) == StrictResult.StrictlyTrue) continue;
+
+                // 共点严通道回验：d₁∩d₂ 与 d₁∩d₃ 是同一射影点
+                var x = HLine.Intersect(d1, d2);
+                var y = HLine.Intersect(d1, d3);
+                if (IsZeroVector(x) || IsZeroVector(y)) continue;
+                if (PointTools.SameStrictly(x, y) != StrictResult.StrictlyTrue) continue;
+
+                string tag = string.Join("", t);
+                string d1Id = EnsureLine(facts, $"AUX:BRI[{tag}][1-4]", d1);
+                string d2Id = EnsureLine(facts, $"AUX:BRI[{tag}][2-5]", d2);
+                string d3Id = EnsureLine(facts, $"AUX:BRI[{tag}][3-6]", d3);
+
+                if (facts.AddFact(ConcurrentFact.Create(d1Id, d2Id, d3Id),
+                    $"[{Title}] 外切六边形 {string.Join(",", t)} 于 {group.Key}：主对角线 {d1Id},{d2Id},{d3Id} 共点"))
+                    count++;
+            }
+        }
+
+        return count;
+    }
+
+    private static bool IsZeroVector(HPoint p) =>
+        p.X.IsNumericallyZero() && p.Y.IsNumericallyZero() && p.W.IsNumericallyZero();
+
+    private static bool IsZeroLine(HLine l) =>
+        l.A.IsNumericallyZero() && l.B.IsNumericallyZero() && l.C.IsNumericallyZero();
+
+    private static string EnsureLine(FactBase facts, string id, HLine line)
+    {
+        if (!facts.Lines.ContainsKey(id)) facts.AddLine(id, line);
+        return id;
+    }
+}
+
+/// <summary>
 /// 命题 7：同一条直线上的三点共线。
 /// 【前提】① 存在直线 L，使 P1、P2、P3 都登记为 L 上的点（事实查询）；
 ///         ② 严通道回验三点坐标确实共线（PointTools.Collinear），不信任标签。
