@@ -143,21 +143,54 @@ public readonly record struct ExactScalar(double Approx, Entity? Exact)
         if (double.IsFinite(Approx) && System.Math.Abs(Approx) > 1e-4)
             return StrictResult.StrictlyFalse;
 
-        Entity simplified = Exact.Simplify();
-        if (simplified.Equals(Entity.Number.Integer.Zero))
-            return StrictResult.StrictlyTrue;
+        // 1) 直接化简
+        if (DecideZero(Exact.Simplify()) is { } decided)
+            return decided;
 
-        if (simplified is Entity.Number)
-            return StrictResult.StrictlyFalse;
+        // 2) 展开括号后再深层化简（带符号的分式 4 轮未化完时追加到 6 轮）
+        var expanded = Exact.Simplify().Expand(4).Simplify(6);
+        if (DecideZero(expanded) is { } decided2)
+            return decided2;
 
-        // 如果带符号的分式默认 4 轮没化完，追加到 6 轮再试一次
-// 如果带符号的分式没化完，先 Expand 展开括号再做深层 Simplify
-        simplified = simplified.Expand(4).Simplify(6);
-        if (simplified.Equals(Entity.Number.Integer.Zero))
-            return StrictResult.StrictlyTrue;
+        // 3) 【有理函数通道】通分为单分式后证"分子 ≡ 0"。
+        //    简化器本身不做通分，形如"参数点 M(k) 恒在定圆上"的恒等式会卡在这里；
+        //    分母的零点属于 NDG（不在恒等式定义域内），不影响"在定义域上恒成立"的判定。
+        try
+        {
+            var fraction = expanded.AsSingleFraction();
+            if (UnwrapProvided(fraction) is Entity.Divf divf
+                && DecideZero(divf.Dividend.Expand(4).Simplify(6)) is { } decided3)
+                return decided3;
+        }
+        catch (Exception)
+        {
+            // 库内部异常不应让严通道崩溃：降级为"未证"
+        }
 
-        return simplified is Entity.Number ? StrictResult.StrictlyFalse : StrictResult.NearZeroUnproven;
+        return StrictResult.NearZeroUnproven;
     }
+
+    /// <summary>
+    /// 把表达式判成"恒零 / 确定非零 / 无法判定"。
+    /// <para>
+    /// 处理 <c>Providedf</c>（形如"0 provided not 1+k²=0"）：其 <c>Expression</c> 是主体，
+    /// <c>Predicate</c> 是定义域条件（即 NDG）。主体恒零 ⇒ 在条件成立的域上恒为零。
+    /// </para>
+    /// </summary>
+    private static StrictResult? DecideZero(Entity entity)
+    {
+        entity = UnwrapProvided(entity);
+
+        if (entity.Equals(Entity.Number.Integer.Zero))
+            return StrictResult.StrictlyTrue;
+        if (entity is Entity.Number)
+            return StrictResult.StrictlyFalse;
+        return null;
+    }
+
+    /// <summary>剥离 Providedf 的条件包装，取主体表达式。</summary>
+    private static Entity UnwrapProvided(Entity entity) =>
+        entity is Entity.Providedf provided ? provided.Expression : entity;
 
     public override string ToString() =>
         Exact is not null ? $"{Approx:G6} [精确: {Exact.Simplify()}]" : $"{Approx:G6} [近似]";
