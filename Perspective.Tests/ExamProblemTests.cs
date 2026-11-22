@@ -59,6 +59,35 @@ public class ExamProblemTests
         Assert.Equal(2.0, e00.ConstantValue.Approx, 9);
     }
 
+    // ---------- 2022 全国乙卷理科 Q20(2)：直接用原始构造也能符号证明 ----------
+    // 本测试回归"齐次坐标归一化"：构造里不做任何手工归一化，
+    // 由 Conic.Intersect / OtherIntersection 在出口归一化，发现器应直接给出 SymbolicProved。
+    [Fact]
+    public void Question2022_NationalB_Q20_2_SymbolicProofWithoutManualNormalization()
+    {
+        var e = Conic.Ellipse(ExactScalar.FromFormula("sqrt(3)"), 2);
+        var a = HPoint.FromCartesian(0, -2);
+        var b = HPoint.FromFormula("3/2", "-1");
+        var p = HPoint.FromCartesian(1, -2);
+        var ab = HLine.FromPoints(a, b);
+
+        HLine BuildHN(ExactScalar t)
+        {
+            var m = e.OtherIntersection(a, HLine.FromPointAndSlope(a, t));
+            var n = e.OtherIntersection(m, HLine.FromPoints(p, m));
+
+            var horizontal = new HLine(0, m.W, -m.Y);
+            var tt = HLine.Intersect(horizontal, ab);
+            var h = new HPoint(2 * tt.X * m.W - m.X * tt.W, 2 * tt.Y * m.W - m.Y * tt.W, tt.W * m.W);
+
+            return HLine.FromPoints(h, n);
+        }
+
+        var finding = DiscoveryEngine.DiscoverFixedPoint(BuildHN);
+        Assert.NotNull(finding);
+        Assert.Equal(ProofStatus.SymbolicProved, finding!.Status);
+    }
+
     // ---------- 2022 全国乙卷理科 Q20(2)：HN 过定点 ----------
     // 说明：完整版会用 DiscoveryEngine.DiscoverFixedPoint 对参数 t 做符号恒等证明
     // （SymbolicProved，约 2 分钟），太重不适合放进默认测试；这里用精确有理实例做快速回归，

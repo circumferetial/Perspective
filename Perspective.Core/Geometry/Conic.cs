@@ -191,7 +191,7 @@ public readonly record struct Conic(Matrix3x3 Matrix)
         return new HPoint(
             rCr * knownPoint.X - two * mCr * r.X,
             rCr * knownPoint.Y - two * mCr * r.Y,
-            rCr * knownPoint.W - two * mCr * r.W);
+            rCr * knownPoint.W - two * mCr * r.W).Normalized();
     }
     
     /// <summary>
@@ -319,7 +319,7 @@ public readonly record struct Conic(Matrix3x3 Matrix)
         {
             if (b.IsNumericallyZero()) return [];
             var s = -c / (2 * b);
-            return [new HPoint(p1.X + s * p2.X, p1.Y + s * p2.Y, p1.W + s * p2.W)];
+            return [new HPoint(p1.X + s * p2.X, p1.Y + s * p2.Y, p1.W + s * p2.W).Normalized()];
         }
 
         var deltaHalf = b * b - a * c;
@@ -328,7 +328,7 @@ public readonly record struct Conic(Matrix3x3 Matrix)
         if (zeroCheck == StrictResult.StrictlyTrue)
         {
             var s = -b / a;
-            return [new HPoint(p1.X + s * p2.X, p1.Y + s * p2.Y, p1.W + s * p2.W)];
+            return [new HPoint(p1.X + s * p2.X, p1.Y + s * p2.Y, p1.W + s * p2.W).Normalized()];
         }
 
         if (deltaHalf.Approx < 0) return [];
@@ -340,8 +340,8 @@ public readonly record struct Conic(Matrix3x3 Matrix)
 
         return
         [
-            new HPoint(p1.X + s1 * p2.X, p1.Y + s1 * p2.Y, p1.W + s1 * p2.W),
-            new HPoint(p1.X + s2 * p2.X, p1.Y + s2 * p2.Y, p1.W + s2 * p2.W)
+            new HPoint(p1.X + s1 * p2.X, p1.Y + s1 * p2.Y, p1.W + s1 * p2.W).Normalized(),
+            new HPoint(p1.X + s2 * p2.X, p1.Y + s2 * p2.Y, p1.W + s2 * p2.W).Normalized()
         ];
     }
     

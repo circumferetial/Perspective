@@ -581,7 +581,7 @@ public readonly struct PascalRule : IFactRule<PascalRule>
     public static Type[] PremiseTypes => [typeof(OnConicFact)];
 
     /// <summary>单条曲线上参与组合的点数上限（控制组合数与符号验证成本）。</summary>
-    private const int MaxPool = 8;
+    private const int MaxPool = 6;
 
     public static int Apply(FactBase facts)
     {
@@ -674,7 +674,7 @@ public readonly struct PascalRule : IFactRule<PascalRule>
 ///         P=(4,0), S=(4/7,0)，(A,B;P,S) = −1，故恒等于 −1。
 ///         本规则对每条边都做 IsHarmonic 严通道回验，不通过不写库。
 /// 【等级】Projective——调和比是射影不变量，本定理不依赖圆锥曲线。
-/// 【实现说明】三个对角点与各边交点作为辅助点登记（幂等 id）；每条四点形最多取 8 个点组合。
+/// 【成本】组合型规则 O(C(n,4))：设点数池与单次产出上限，避免场景里无关的点引发爆炸。
 /// </summary>
 public readonly struct CompleteQuadrangleHarmonicRule : IFactRule<CompleteQuadrangleHarmonicRule>
 {
@@ -683,7 +683,10 @@ public readonly struct CompleteQuadrangleHarmonicRule : IFactRule<CompleteQuadra
     public static Type[] ConclusionTypes => [typeof(HarmonicFact)];
     public static Type[] PremiseTypes => [];
 
-    private const int MaxPool = 8;
+    private const int MaxPool = 6;
+
+    /// <summary>单次推演允许产出的上限（成本闸；非语义限制，见 docs/architecture.md）。</summary>
+    private const int MaxFactsPerRun = 36;
 
     public static int Apply(FactBase facts)
     {
@@ -750,16 +753,24 @@ public readonly struct CompleteQuadrangleHarmonicRule : IFactRule<CompleteQuadra
                 if (IsZeroVector(S)) continue;
                 if (PointTools.Same(S, s.X) || PointTools.Same(S, s.Y) || PointTools.Same(S, s.G)) continue;
 
+                string sId = $"AUX:CQ[{aId}{bId}{cId}{dId}][{s.XId}{s.YId}]";
+
+                // 该边已验证过：跳过昂贵的交比严证（后续 pass 不再重复付成本）
+                if (facts.Facts.Contains(new HarmonicFact(s.XId, s.YId, s.GId, sId))) continue;
+
                 // 数值预筛：交比明显不是 −1 的组合直接跳过（结论仍由严通道决定）
                 if (!HarmonicApprox(s.X, s.Y, s.G, S)) continue;
 
                 if (GeometryAudit.IsHarmonic(s.X, s.Y, s.G, S) != StrictResult.StrictlyTrue) continue;
 
-                string sId = EnsurePoint(facts, $"AUX:CQ[{aId}{bId}{cId}{dId}][{s.XId}{s.YId}]", S);
+                EnsurePoint(facts, sId, S);
                 if (facts.AddDerivedFact(
                         new HarmonicFact(s.XId, s.YId, s.GId, sId),
                         RuleIds.CompleteQuadrangleHarmonic))
                     count++;
+
+                // 组合型规则的显式成本上限（非语义限制，见 docs/architecture.md）
+                if (count >= MaxFactsPerRun) return count;
             }
         }
 
@@ -843,7 +854,7 @@ public readonly struct BrianchonRule : IFactRule<BrianchonRule>
     public static Type[] ConclusionTypes => [typeof(ConcurrentFact)];
     public static Type[] PremiseTypes => [typeof(TangentFact)];
 
-    private const int MaxPool = 8;
+    private const int MaxPool = 6;
 
     public static int Apply(FactBase facts)
     {

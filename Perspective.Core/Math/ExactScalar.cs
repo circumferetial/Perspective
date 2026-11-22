@@ -143,31 +143,49 @@ public readonly record struct ExactScalar(double Approx, Entity? Exact)
         if (double.IsFinite(Approx) && System.Math.Abs(Approx) > 1e-4)
             return StrictResult.StrictlyFalse;
 
-        // 1) 直接化简
+        // 1) 【有理函数通道优先】通分为单分式后证"分子 ≡ 0"。
+        //    这一步通常最便宜且最有决定性（实测某参数恒等式：0.03s 证出，
+        //    而先跑 Simplify/Expand 需要 30s+）。
+        //    门控：只有表达式里真的含除法才尝试，避免对纯多项式白付通分成本。
+        if (ContainsDivision(Exact) && TryRationalZero(Exact) is { } rational)
+            return rational;
+
+        // 2) 直接化简
         if (DecideZero(Exact.Simplify()) is { } decided)
             return decided;
 
-        // 2) 展开括号后再深层化简（带符号的分式 4 轮未化完时追加到 6 轮）
-        var expanded = Exact.Simplify().Expand(4).Simplify(6);
-        if (DecideZero(expanded) is { } decided2)
+        // 3) 展开括号后再深层化简（带符号的分式 4 轮未化完时追加到 6 轮）
+        if (DecideZero(Exact.Simplify().Expand(4).Simplify(6)) is { } decided2)
             return decided2;
 
-        // 3) 【有理函数通道】通分为单分式后证"分子 ≡ 0"。
-        //    简化器本身不做通分，形如"参数点 M(k) 恒在定圆上"的恒等式会卡在这里；
-        //    分母的零点属于 NDG（不在恒等式定义域内），不影响"在定义域上恒成立"的判定。
+        return StrictResult.NearZeroUnproven;
+    }
+
+    /// <summary>表达式树中是否含除法节点（廉价门控，避免纯多项式白付通分成本）。</summary>
+    private static bool ContainsDivision(Entity entity)
+    {
+        if (entity is Entity.Divf) return true;
+        foreach (var node in entity.Nodes)
+            if (node is Entity.Divf) return true;
+        return false;
+    }
+
+    /// <summary>
+    /// 有理函数判零：化单分式后只看分子。分母的零点是 NDG，不影响"定义域上恒成立"。
+    /// 返回 null 表示"不是分式或未判定"，交由后续通道处理。
+    /// </summary>
+    private static StrictResult? TryRationalZero(Entity entity)
+    {
         try
         {
-            var fraction = expanded.AsSingleFraction();
-            if (UnwrapProvided(fraction) is Entity.Divf divf
-                && DecideZero(divf.Dividend.Expand(4).Simplify(6)) is { } decided3)
-                return decided3;
+            var fraction = UnwrapProvided(entity).AsSingleFraction();
+            if (UnwrapProvided(fraction) is not Entity.Divf divf) return null;
+            return DecideZero(divf.Dividend.Expand(4).Simplify(6));
         }
         catch (Exception)
         {
-            // 库内部异常不应让严通道崩溃：降级为"未证"
+            return null;   // 库内部异常不应让严通道崩溃
         }
-
-        return StrictResult.NearZeroUnproven;
     }
 
     /// <summary>

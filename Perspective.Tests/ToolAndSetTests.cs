@@ -43,6 +43,32 @@ public class ToolAndSetTests
         Assert.Equal(StrictResult.StrictlyFalse, ConicTools.IsPolarLine(circle, p, new HLine(0, 1, 0)));
     }
 
+    /// <summary>齐次坐标归一化：有限点出口处 W 应化为 1，避免表达式膨胀。</summary>
+    [Fact]
+    public void ConicIntersections_AreNormalized()
+    {
+        var circle = Scenes.Circle4;
+        var pts = circle.Intersect(new HLine(0, 1, -1));   // y = 1
+
+        Assert.Equal(2, pts.Length);
+        foreach (var p in pts)
+        {
+            Assert.Equal(1.0, p.W.Approx, 12);
+            Assert.True(System.Math.Abs(p.X.Approx) < 10);
+        }
+    }
+
+    [Fact]
+    public void OtherIntersection_IsNormalized()
+    {
+        var circle = Scenes.Circle4;
+        var known = HPoint.FromCartesian(0, 2);
+        var other = circle.OtherIntersection(known, new HLine(1, -1, -1));
+
+        Assert.Equal(1.0, other.W.Approx, 12);
+        Assert.Equal(StrictResult.StrictlyTrue, circle.ContainsStrictly(other));
+    }
+
     [Fact]
     public void RealSets_UnionIntersectSubtract()
     {

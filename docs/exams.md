@@ -14,7 +14,7 @@
 | 2022 浙江 21 | (ⅰ) 最大距离 | ❌ | 最值 |
 |  | (ⅱ) |CD| 最小值 | ❌ | 最值 |
 | 2022 全国乙理 20 | (1) 椭圆方程 | ✅ | 由 A、B 在 E 上直接得 x²/3+y²/4=1 |
-|  | (2) HN 过定点 | ✅ | **`DiscoveryEngine.DiscoverFixedPoint` 得 SymbolicProved，定点 (0,−2)** |
+|  | (2) HN 过定点 | ✅ | **`DiscoveryEngine.DiscoverFixedPoint` 得 SymbolicProved，定点 (0,−2)**；归一化后约 0.55s（原 99.5s） |
 | 2020 上海 20 | (1) 求 b | ✅ | 代数消元 |
 |  | (2) 长度/角度 | ❌ | 度量层 |
 |  | (3) OM·ON 表达式 | ✅ | 韦达/符号代入 |
