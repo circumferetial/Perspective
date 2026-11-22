@@ -256,6 +256,10 @@ public sealed class FactBase
     public bool AddDerivedFact(GeoFact fact, string ruleId, params GeoFact[] premises) =>
         AddFactCore(fact, new Derivation(ruleId, fact, premises));
 
+    /// <summary>登记"外部构造"产生的事实：来源写入 Derivation.Note（可追溯，不伪造推导）。</summary>
+    public bool AddConstructedFact(GeoFact fact, string provenance) =>
+        AddFactCore(fact, new Derivation(RuleIds.ExternalConstruction, fact, [], provenance));
+
     private bool AddFactCore(GeoFact fact, Derivation derivation)
     {
         fact = Canonicalize(fact);

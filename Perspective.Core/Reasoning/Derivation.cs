@@ -44,4 +44,7 @@ public static class RuleIds
     public const string Pascal = "pascal";
     public const string CompleteQuadrangleHarmonic = "complete-quadrangle-harmonic";
     public const string Brianchon = "brianchon";
+
+    /// <summary>外部构造（人/LLM/构造搜索提出、机器验收）产生的事实。</summary>
+    public const string ExternalConstruction = "external-construction";
 }

@@ -127,6 +127,27 @@
 - **测试隔离**：`Perspective.Oracle.Z3.Tests` 独立成项目——Z3 原生库会显著拖慢
   测试进程启动，不能污染 `Perspective.Tests` 的快速回归。
 
+## 4h. 外部构造注入（Proposer / Verifier 分工）
+
+**动机**：用户或外部 LLM 可能想到一个"惊艳的辅助构造"，而我们的规则库没想到。
+系统的职责不是猜出它，而是**严格验收**它。这正是 AlphaGeometry / HAGeo 的分工：
+LLM/启发式负责"提构造"，符号引擎负责"验真假"。
+
+**入口**：`ConstructionEngine.ProposePoint(facts, id, point, claims, proposedBy)`。
+
+| 步骤 | 行为 |
+|---|---|
+| ① 声明 | 外部给出点坐标 + 应满足的关系（`ClaimPointOnLine` / `OnConic` / `Midpoint`） |
+| ② 验证 | 逐条走严通道；任一不成立即**拒绝**，返回具体哪条失败 |
+| ③ 登记 | 全部通过才写入：结构性点 + 对应事实，`Derivation.RuleId = external-construction`，`Note` 记录来源（user/llm/search） |
+| ④ 使用 | 与机器构造地位相同，照常参与规则链与反向链 |
+
+**设计要点**：
+- 验收失败**不污染事实库**（不写任何事实），避免"错误构造"污染后续推理；
+- 来源写进 `Derivation.Note`，解释层可如实叙述"该步由外部建议、经验证成立"；
+- 未来的构造搜索只是另一个 Proposer，复用同一验收通道；
+- 当前只支持**点**构造（线上点/曲线上点/中点）；线、圆锥曲线、垂足等后续扩展。
+
 ## 5. 事实模型
 
 > 完整的事实/定理清单见 [facts-theorems.md](facts-theorems.md)（单一出处）。
