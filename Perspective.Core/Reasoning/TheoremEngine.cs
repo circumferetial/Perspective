@@ -602,6 +602,9 @@ public readonly struct PascalRule : IFactRule<PascalRule>
                 if (!facts.Points.TryGetValue(pid, out var pt)) continue;
                 if (conic.ContainsStrictly(pt) == StrictResult.StrictlyTrue) pool.Add(pid);
             }
+            if (facts.PointsOnConic(conicId).Count() > pool.Count)
+                facts.Diagnostics.Add(
+                    $"[Pascal] 曲线上候选点 {facts.PointsOnConic(conicId).Count()} 个，仅取前 {pool.Count} 个；可能漏解");
             if (pool.Count < 6) continue;
 
             for (int i = 0; i < pool.Count - 5; i++)
@@ -656,7 +659,8 @@ public readonly struct PascalRule : IFactRule<PascalRule>
     /// <summary>确保辅助点已登记（同 id 已存在则不覆盖）。</summary>
     private static string EnsurePoint(FactBase facts, string id, HPoint p)
     {
-        if (!facts.Points.ContainsKey(id)) facts.AddPoint(id, p);
+        // 规则生成的派生点：不参与组合型规则的点枚举
+        if (!facts.Points.ContainsKey(id)) facts.AddPoint(id, p, structural: false);
         return id;
     }
 }
@@ -683,7 +687,7 @@ public readonly struct CompleteQuadrangleHarmonicRule : IFactRule<CompleteQuadra
     public static Type[] ConclusionTypes => [typeof(HarmonicFact)];
     public static Type[] PremiseTypes => [];
 
-    private const int MaxPool = 6;
+    private const int MaxPool = 5;
 
     /// <summary>单次推演允许产出的上限（成本闸；非语义限制，见 docs/architecture.md）。</summary>
     private const int MaxFactsPerRun = 36;
@@ -692,15 +696,19 @@ public readonly struct CompleteQuadrangleHarmonicRule : IFactRule<CompleteQuadra
     {
         int count = 0;
 
+        // 候选池：只枚举**结构化点**（用户/题面声明的点），派生辅助点默认不参与；
+        // 被截断/排除的数量会写入 Diagnostics，避免静默漏解。
+        var allStructural = facts.StructuralPointIds.ToList();
         var pool = new List<string>();
-        foreach (var pid in facts.Points.Keys)
+        foreach (var pid in allStructural)
         {
             if (pool.Count >= MaxPool) break;
-            // 规则自动生成的辅助点（AUX: 前缀）不作为结构性顶点参与枚举，
-            // 否则下一轮会把它们当成新顶点，导致组合爆炸与错误的四边形。
-            if (pid.StartsWith("AUX:", StringComparison.Ordinal)) continue;
             pool.Add(pid);
         }
+        if (allStructural.Count > pool.Count)
+            facts.Diagnostics.Add(
+                $"[完全四点形] 候选点 {allStructural.Count} 个，仅取前 {pool.Count} 个组合；" +
+                "可能漏解（可用 PromoteToStructural 或提高 MaxPool）");
         if (pool.Count < 4) return 0;
 
         for (int i = 0; i < pool.Count - 3; i++)
@@ -774,7 +782,12 @@ public readonly struct CompleteQuadrangleHarmonicRule : IFactRule<CompleteQuadra
                     count++;
 
                 // 组合型规则的显式成本上限（非语义限制，见 docs/architecture.md）
-                if (count >= MaxFactsPerRun) return count;
+                if (count >= MaxFactsPerRun)
+                {
+                    facts.Diagnostics.Add(
+                        $"[完全四点形] 单次产出达到上限 {MaxFactsPerRun}，其余组合未检查；可能漏解");
+                    return count;
+                }
             }
         }
 
@@ -832,7 +845,8 @@ public readonly struct CompleteQuadrangleHarmonicRule : IFactRule<CompleteQuadra
 
     private static string EnsurePoint(FactBase facts, string id, HPoint p)
     {
-        if (!facts.Points.ContainsKey(id)) facts.AddPoint(id, p);
+        // 规则生成的派生点：不参与组合型规则的点枚举
+        if (!facts.Points.ContainsKey(id)) facts.AddPoint(id, p, structural: false);
         return id;
     }
 }

@@ -103,6 +103,24 @@ public sealed class FactBase
     public int CachedCheckCount => _checkCache.Count;
 
     /// <summary>
+    /// 结构化点（用户/题面声明的构造点）与派生点（规则生成的辅助点）的区分。
+    /// 组合型规则只枚举结构化点；派生点需要参与时显式提升（见 <see cref="PromoteToStructural"/>）。
+    /// </summary>
+    private readonly HashSet<string> _structuralPoints = [];
+
+    /// <summary>推演诊断：截断、跳过的候选等"可能漏解"的提示（不静默）。</summary>
+    public List<string> Diagnostics { get; } = [];
+
+    /// <summary>某点是否属于结构化点（用户声明）而非规则派生的辅助点。</summary>
+    public bool IsStructural(string pointId) => _structuralPoints.Contains(pointId);
+
+    /// <summary>把派生点提升为结构化点（例如用户希望它也参与组合枚举）。</summary>
+    public void PromoteToStructural(string pointId) => _structuralPoints.Add(pointId);
+
+    /// <summary>结构化点 id 列表（组合型规则的候选池）。</summary>
+    public IEnumerable<string> StructuralPointIds => Points.Keys.Where(IsStructural);
+
+    /// <summary>
     /// 登记一条"某表达式不为零"的非退化假设。
     /// 【一致性检查】若该表达式**恒为零**，说明在这些对象下假设必然失败（构形退化），
     /// 返回 false 并不登记。
@@ -156,7 +174,16 @@ public sealed class FactBase
     private readonly Dictionary<string, HashSet<string>> _thirdPointsByPair = [];
     private readonly Dictionary<string, HashSet<string>> _thirdLinesByPair = [];
 
-    public void AddPoint(string id, HPoint p) => Points[id] = p;
+    /// <summary>
+    /// 登记点。<paramref name="structural"/> 为 false 表示这是规则生成的派生点
+    /// （不参与组合型规则的点枚举）；用户/题面声明的点默认是结构化点。
+    /// </summary>
+    public void AddPoint(string id, HPoint p, bool structural = true)
+    {
+        Points[id] = p;
+        if (structural) _structuralPoints.Add(id);
+    }
+
     public void AddLine(string id, HLine l) => Lines[id] = l;
     public void AddConic(string id, Conic c) => Conics[id] = c;
 

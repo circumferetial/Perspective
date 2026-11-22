@@ -101,6 +101,12 @@
   坐标在事实库里是只增不改的，重复调用结果不变。入口：`FactBase.CachedCheck(key, compute)`。
 - **不能缓存**：依赖"事实是否存在"的判定（例如"找不到某条极线"）。事实库是 append-only，
   后续规则可能补上该事实；缓存失败会导致**漏推**。
+- **候选池 = 结构化点**：组合型规则只枚举用户/题面声明的点（`FactBase.StructuralPointIds`）；
+  规则生成的派生点默认不参与，需要时用 `PromoteToStructural` 显式提升。
+- **截断必须可见**（防"砍候选点漏掉偏题"）：候选被池上限截断、或单次产出达到上限时，
+  规则把提示写入 `FactBase.Diagnostics`，调用方可检查"是否可能漏解"，不再是静默丢弃。
+- 实测：四点形候选池 6→5 后，BackwardChaining 测试 7.6s → 4.6s，全部测试 9s → 4s；
+  代价是"可能漏解"，但已由 Diagnostics 显式报告。
 - **每 pass 产出上限 + 缓存**：组合型规则设 `MaxFactsPerRun` 后会分多个 pass 继续，
   缓存让后续 pass 跳过已验组合（实测四点形规则 pass1 1.43s / pass2 2.59s，
   pass2 只算新组合，pass3 0s）。
