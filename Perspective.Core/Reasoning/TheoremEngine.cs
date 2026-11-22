@@ -1162,3 +1162,89 @@ public readonly struct PerpendicularParallelRule : IFactRule<PerpendicularParall
         return count;
     }
 }
+
+/// <summary>
+/// 命题 14：平行线的对应角相等（L₁∥L₂ ⇒ θ(L₁, M) ≡ θ(L₂, M) mod π）。
+/// 【前提】ParallelFact；严通道回验两线确实平行，M 与两线互异。
+/// 【等级】Similarity——有向角是相似不变量。
+/// </summary>
+public readonly struct AngleFromParallelRule : IFactRule<AngleFromParallelRule>
+{
+    public static string Title => "平行线的对应角相等";
+    public static TransformLevel RequiredLevel => TransformLevel.Similarity;
+    public static Type[] ConclusionTypes => [typeof(AngleEqualFact)];
+    public static Type[] PremiseTypes => [typeof(ParallelFact)];
+
+    public static int Apply(FactBase facts)
+    {
+        int count = 0;
+        foreach (var parallel in facts.Parallels.ToList())
+        {
+            if (!facts.Lines.TryGetValue(parallel.Line1Id, out var first) ||
+                !facts.Lines.TryGetValue(parallel.Line2Id, out var second)) continue;
+
+            foreach (var thirdId in facts.Lines.Keys.ToList())
+            {
+                if (thirdId == parallel.Line1Id || thirdId == parallel.Line2Id) continue;
+                if (!facts.Lines.TryGetValue(thirdId, out var third)) continue;
+
+                var candidate = AngleEqualFact.Create(parallel.Line1Id, thirdId, parallel.Line2Id, thirdId);
+                if (candidate.A1 == candidate.B1 && candidate.A2 == candidate.B2) continue;
+                if (GeometryAudit.AreAngleEqual(first, third, second, third, candidate.Sign) != StrictResult.StrictlyTrue)
+                    continue;
+
+                if (facts.AddDerivedFact(candidate, RuleIds.AngleFromParallel, parallel)) count++;
+            }
+        }
+        return count;
+    }
+}
+
+/// <summary>
+/// 命题 15：角相等传递（θ(A)≡s₁θ(B) 且 θ(B)≡s₂θ(C) ⇒ θ(A)≡s₁s₂θ(C)）。
+/// 【前提】两条 AngleEqualFact（共享同一线对）；严通道回验结论。
+/// 【等级】Similarity。
+/// </summary>
+public readonly struct AngleTransitivityRule : IFactRule<AngleTransitivityRule>
+{
+    public static string Title => "角相等传递";
+    public static TransformLevel RequiredLevel => TransformLevel.Similarity;
+    public static Type[] ConclusionTypes => [typeof(AngleEqualFact)];
+    public static Type[] PremiseTypes => [typeof(AngleEqualFact)];
+
+    public static int Apply(FactBase facts)
+    {
+        int count = 0;
+        foreach (var first in facts.AngleEquals.ToList())
+        {
+            foreach (var second in facts.AnglesInvolving(first.B1, first.B2).ToList())
+            {
+                string otherA1, otherA2;
+                if (second.A1 == first.B1 && second.A2 == first.B2)
+                {
+                    otherA1 = second.B1; otherA2 = second.B2;
+                }
+                else if (second.B1 == first.B1 && second.B2 == first.B2)
+                {
+                    otherA1 = second.A1; otherA2 = second.A2;
+                }
+                else continue;
+
+                var candidate = AngleEqualFact.CreateExplicit(
+                    first.A1, first.A2, otherA1, otherA2, first.Sign * second.Sign);
+                if (candidate.A1 == candidate.B1 && candidate.A2 == candidate.B2) continue;
+
+                if (!facts.Lines.TryGetValue(candidate.A1, out var a1) ||
+                    !facts.Lines.TryGetValue(candidate.A2, out var a2) ||
+                    !facts.Lines.TryGetValue(candidate.B1, out var b1) ||
+                    !facts.Lines.TryGetValue(candidate.B2, out var b2)) continue;
+
+                if (GeometryAudit.AreAngleEqual(a1, a2, b1, b2, candidate.Sign) != StrictResult.StrictlyTrue)
+                    continue;
+
+                if (facts.AddDerivedFact(candidate, RuleIds.AngleTransitivity, first, second)) count++;
+            }
+        }
+        return count;
+    }
+}

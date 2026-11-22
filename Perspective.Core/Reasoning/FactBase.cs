@@ -63,6 +63,54 @@ public sealed record PerpendicularFact(string Line1Id, string Line2Id) : GeoFact
         string.CompareOrdinal(l1, l2) <= 0 ? new(l1, l2) : new(l2, l1);
 }
 
+/// <summary>
+/// 有向角相等（mod π）：θ(A1,A2) ≡ Sign·θ(B1,B2) (mod π)。
+/// <para>
+/// 【规范化】每对线内部按 id 排序（换序使角取负 → 记入 Sign），
+/// 两对整体再按 lexicographic 排序（交换两对不改变 Sign）。
+/// 因此"∠(L1,L2)=∠(L3,L4)"与"∠(L4,L3)=∠(L2,L1)"等全部归一到同一事实。
+/// </para>
+/// <para>
+/// 【视角】有向角是相似不变量（Similarity 层）。
+/// </para>
+/// </summary>
+public sealed record AngleEqualFact(string A1, string A2, string B1, string B2, int Sign) : GeoFact
+{
+    /// <summary>从"已知 θ(l1,l2) = sign·θ(l3,l4)"构造规范事实（再乘以两对内排序引入的符号）。</summary>
+    public static AngleEqualFact CreateExplicit(string l1, string l2, string l3, string l4, int sign)
+    {
+        var ((a1, a2), sa) = CanonPair(l1, l2);
+        var ((b1, b2), sb) = CanonPair(l3, l4);
+        int totalSign = sign * sa * sb;
+
+        if (ComparePair((a1, a2), (b1, b2)) > 0)
+            ((a1, a2), (b1, b2)) = ((b1, b2), (a1, a2));
+
+        return new(a1, a2, b1, b2, totalSign);
+    }
+
+    public static AngleEqualFact Create(string l1, string l2, string l3, string l4)
+    {
+        var ((a1, a2), sa) = CanonPair(l1, l2);
+        var ((b1, b2), sb) = CanonPair(l3, l4);
+
+        // 两对按 lexicographic 排序；交换两对不改变 Sign
+        if (ComparePair((a1, a2), (b1, b2)) > 0)
+            ((a1, a2), (b1, b2)) = ((b1, b2), (a1, a2));
+
+        return new(a1, a2, b1, b2, sa * sb);
+    }
+
+    private static ((string, string) Pair, int Sign) CanonPair(string x, string y) =>
+        string.CompareOrdinal(x, y) <= 0 ? ((x, y), 1) : ((y, x), -1);
+
+    private static int ComparePair((string, string) a, (string, string) b)
+    {
+        int first = string.CompareOrdinal(a.Item1, b.Item1);
+        return first != 0 ? first : string.CompareOrdinal(a.Item2, b.Item2);
+    }
+}
+
 /// <summary>非退化假设：<see cref="Expression"/> 不为零（不参与推导，只限定结论适用域）。</summary>
 public sealed record NonDegenerateAssumption(string Label, ExactScalar Expression);
 
@@ -169,6 +217,7 @@ public sealed class FactBase
     private readonly List<ConstantSlopeProductFact> _slopeProducts = [];
     private readonly List<ParallelFact> _parallels = [];
     private readonly List<PerpendicularFact> _perpendiculars = [];
+    private readonly List<AngleEqualFact> _angleEquals = [];
 
     public IReadOnlyList<OnLineFact> OnLines => _onLines;
     public IReadOnlyList<OnConicFact> OnConics => _onConics;
@@ -183,6 +232,7 @@ public sealed class FactBase
     public IReadOnlyList<ConstantSlopeProductFact> SlopeProducts => _slopeProducts;
     public IReadOnlyList<ParallelFact> Parallels => _parallels;
     public IReadOnlyList<PerpendicularFact> Perpendiculars => _perpendiculars;
+    public IReadOnlyList<AngleEqualFact> AngleEquals => _angleEquals;
 
     // --- 按 id 的索引（同上，由 AddFact 增量维护） ---
     private static readonly IReadOnlySet<string> EmptySet = new HashSet<string>();
@@ -194,6 +244,7 @@ public sealed class FactBase
     private readonly Dictionary<string, List<PolarOfFact>> _polarsOfConic = [];
     private readonly Dictionary<string, HashSet<string>> _linesParallelTo = [];
     private readonly Dictionary<string, HashSet<string>> _linesPerpendicularTo = [];
+    private readonly Dictionary<string, List<AngleEqualFact>> _anglesByPair = [];
 
     // 幂集事实（三点共线 / 三线共点）无法按单个 id 索引，按"对"索引第三元。
     private readonly Dictionary<string, HashSet<string>> _thirdPointsByPair = [];
@@ -273,6 +324,10 @@ public sealed class FactBase
     public IReadOnlySet<string> LinesPerpendicularTo(string lineId) =>
         _linesPerpendicularTo.TryGetValue(lineId, out var set) ? set : EmptySet;
 
+    /// <summary>包含指定线对（任一侧）的所有"角相等"事实。</summary>
+    public IReadOnlyList<AngleEqualFact> AnglesInvolving(string line1, string line2) =>
+        _anglesByPair.TryGetValue(PairKey(line1, line2), out var list) ? list : [];
+
     /// <summary>注册一条新事实（无规则出处：初始条件 / 辅助连线；解释由 Note 承担）。</summary>
     public bool AddFact(GeoFact fact, string note) =>
         AddFactCore(fact, new Derivation(RuleIds.AdHoc, fact, [], note));
@@ -306,6 +361,8 @@ public sealed class FactBase
         ConcurrentFact f => ConcurrentFact.Create(f.L1Id, f.L2Id, f.L3Id),
         ParallelFact f => ParallelFact.Create(f.Line1Id, f.Line2Id),
         PerpendicularFact f => PerpendicularFact.Create(f.Line1Id, f.Line2Id),
+        // 注意：Create 会按 id 顺序重推符号，这里必须保留原有 Sign
+        AngleEqualFact f => AngleEqualFact.CreateExplicit(f.A1, f.A2, f.B1, f.B2, f.Sign),
         _ => fact
     };
 
@@ -395,7 +452,20 @@ public sealed class FactBase
                 Bucket(_linesPerpendicularTo, f.Line1Id).Add(f.Line2Id);
                 Bucket(_linesPerpendicularTo, f.Line2Id).Add(f.Line1Id);
                 break;
+
+            case AngleEqualFact f:
+                _angleEquals.Add(f);
+                BucketList(_anglesByPair, PairKey(f.A1, f.A2)).Add(f);
+                BucketList(_anglesByPair, PairKey(f.B1, f.B2)).Add(f);
+                break;
         }
+    }
+
+    private static List<T> BucketList<T>(Dictionary<string, List<T>> map, string key)
+    {
+        if (!map.TryGetValue(key, out var list))
+            map[key] = list = [];
+        return list;
     }
 
     private static HashSet<string> Bucket(Dictionary<string, HashSet<string>> map, string key)

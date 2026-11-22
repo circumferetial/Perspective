@@ -51,4 +51,8 @@ public static class RuleIds
     public const string ParallelTransitivity = "parallel-transitivity";
 
     public const string PerpendicularParallel = "perpendicular-parallel";
+
+    public const string AngleFromParallel = "angle-from-parallel";
+
+    public const string AngleTransitivity = "angle-transitivity";
 }

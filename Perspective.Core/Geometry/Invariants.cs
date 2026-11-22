@@ -87,6 +87,25 @@ public static class GeometryAudit
         return (num / den).Simplified();
 
     }
+    /// <summary>
+    /// 严格检验"有向角相等（mod π）"：θ(a1,a2) ≡ sign·θ(b1,b2)。
+    /// 【判据】tan θ = cross/dot；θ₁ = sign·θ₂ ⇔ cross₁·dot₂ − sign·cross₂·dot₁ = 0
+    /// （tan 为奇函数；直角时 dot=0，判据仍然正确：一侧直角另一侧非直角时不可能成立）。
+    /// </summary>
+    public static StrictResult AreAngleEqual(HLine a1, HLine a2, HLine b1, HLine b2, int sign)
+    {
+        static (ExactScalar Cross, ExactScalar Dot) TanPair(HLine x, HLine y)
+        {
+            var (x1, x2) = (-x.B, x.A);   // 方向向量 (−B, A)
+            var (y1, y2) = (-y.B, y.A);
+            return (x1 * y2 - x2 * y1, x1 * y1 + x2 * y2);
+        }
+
+        var (crossA, dotA) = TanPair(a1, a2);
+        var (crossB, dotB) = TanPair(b1, b2);
+        return (crossA * dotB - sign * crossB * dotA).VerifyStrictZero();
+    }
+
     /// <summary>严格检验共线四点是否构成调和点列：交比 (A, B; C, D) == -1</summary>
     public static StrictResult IsHarmonic(HPoint a, HPoint b, HPoint c, HPoint d)
     {

@@ -32,6 +32,7 @@
 | `ConstantSlopeProductFact` | Line1Id, Line2Id, Value | 斜率积为定值 | Affine | 类型视图 |
 | `ParallelFact` | Line1Id, Line2Id | 两线平行（不重合） | Affine | **排序二元组** + 双向索引 |
 | `PerpendicularFact` | Line1Id, Line2Id | 两线垂直 | Similarity | **排序二元组** + 双向索引 |
+| `AngleEqualFact` | A1, A2, B1, B2, Sign | 有向角 θ(A1,A2) ≡ Sign·θ(B1,B2) mod π | Similarity | 对内排序 + 对间排序 + Sign；按线对索引 |
 
 ## 2. 定理规则（当前 11 条）
 
@@ -50,15 +51,17 @@
 | 11 | Brianchon | 六条切线切同一非退化曲线 | `ConcurrentFact`（主对角线） | Projective | Pascal 对偶 |
 | 12 | 平行传递 | 两条 `ParallelFact` | `ParallelFact` | Affine | 三线互异 + 严通道回验 |
 | 13 | 垂直与平行相容 | `PerpendicularFact` + `ParallelFact` | `PerpendicularFact` | Similarity | 垂直非仿射不变量 |
+| 14 | 平行线的对应角相等 | `ParallelFact` | `AngleEqualFact` | Similarity | θ(L₁,M) ≡ θ(L₂,M) |
+| 15 | 角相等传递 | 两条 `AngleEqualFact`（共享线对） | `AngleEqualFact` | Similarity | 符号相乘：s₁·s₂ |
 
 ## 3. 已知缺口（按优先级）
 
-### 3.1 度量/角度/比例类事实（部分已补）
+### 3.1 度量/比例类事实（角度已补，比例仍缺）
 
 | 计划事实 | 含义 | 等级 | 注意 |
 |---|---|---|---|
 
-| `AngleEqualFact` | 有向角 ∠ABC ≡ ∠DEF (mod π) | Similarity | 需按 mod π 规范化，否则无法传递 |
+
 | `SegmentRatioFact` | \|AB\|/\|CD\| = r | Similarity | 长度比是相似不变量，不是仿射不变量 |
 | `AreaRatioFact` | S(ABC)/S(DEF) = r | Affine | 面积比是仿射不变量（行列式比） |
 | `CrossRatioFact` | (A,B;C,D) = r | Projective | `HarmonicFact` 是其 r=−1 特例；可考虑统一 |
