@@ -123,6 +123,18 @@
 - **不支持**：对参数的存在量词（"存在某个 t 使…"）与量词交替——它们属于求解器/消元层，
   不属于规则层。
 
+## 3.7 度量层：距离 / 点积 / 角度 / 面积
+
+- 实现：`Geometry.Metric`——`DistanceSquared`/`Distance`、`Dot`/`Cross`、
+  `TanAngle`/`TanAngleUnsigned`、`TriangleArea2`/`TriangleArea`；全部精确（含根号基因）。
+- **视角纪律**：度量不是射影不变量，只在 `Similarity` 及更低视角有意义；
+  规则/命题用到度量时必须先检查 `CurrentLevel ≤ Similarity`。
+- **去根号的正确姿势**：含 `tan∠` 的方程直接解不动，应平方成
+  `cross² − tan²·dot² = 0`（根号被平方消掉），解出后再**回验 tan**——
+  平方会引入符号歧义与退化增根（例：2022 新高考Ⅰ21(2) 的 cc=3 就是"弦过 A"的增根）。
+- 反解入口：`InverseExamSolver.SolveChordSlopeForZeroSlopeSum`（弦族斜率和条件）、
+  `SolveAreaFromTangent`（已知 tan 求面积）。
+
 ## 4. 明确的能力边界（不做的部分）
 
 | 类型 | 状态 | 原因 |

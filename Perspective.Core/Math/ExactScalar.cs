@@ -129,6 +129,10 @@ public readonly record struct ExactScalar(double Approx, Entity? Exact)
     public static ExactScalar Sin(ExactScalar x) =>
         new(System.Math.Sin(x.Approx), x.Exact is not null ? AngouriMath.MathS.Sin(x.Exact) : null);
 
+    /// <summary>绝对值（保留符号基因）。</summary>
+    public ExactScalar Abs() =>
+        new(System.Math.Abs(Approx), Exact is not null ? AngouriMath.MathS.Abs(Exact) : null);
+
     // --- 快通道与严通道 ---
 
     /// <summary>【快通道】仅用于画图渲染、判断无穷远、初步吸附筛选</summary>

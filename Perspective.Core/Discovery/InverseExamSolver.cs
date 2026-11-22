@@ -239,4 +239,102 @@ public static class InverseExamSolver
 
         return results;
     }
+
+    /// <summary>
+    /// 【弦族斜率条件】已知点 A 在圆锥曲线 C 上，求弦 l（不经过 A）满足
+    /// "AP、AQ 的斜率之和为零" 时 l 的斜率。
+    /// <para>
+    /// 【推导】A 在曲线上时双线组矩阵每项都含因子 s = l(A)（退化分支：l 过 A），
+    /// 故斜率和条件等价于 M01/s = 0。若 M01/s 与截距 c 无关，则斜率被唯一确定。
+    /// </para>
+    /// </summary>
+    /// <returns>满足条件的斜率集合（空集表示条件不能唯一确定斜率，或输入退化）。</returns>
+    public static Entity.Set SolveChordSlopeForZeroSlopeSum(
+        Conic conic, HPoint pointOnConic, string slopeName = "m", string interceptName = "c")
+    {
+        if (conic.ContainsStrictly(pointOnConic) != StrictResult.StrictlyTrue)
+            return Entity.Set.Empty;
+
+        var m = ExactScalar.FromSymbol(slopeName);
+        var c = ExactScalar.FromSymbol(interceptName);
+        var line = new HLine(m, -1, c);
+        var pair = conic.LinePairFrom(pointOnConic, line);
+
+        // A 在曲线上 => M01 = s · g，其中 s = l(A)（l 过 A 的退化分支）
+        var s = line.A * pointOnConic.X + line.B * pointOnConic.Y + line.C * pointOnConic.W;
+        var g = (pair.Matrix.M01 / s).Simplified();
+        if (g.Exact is null) return Entity.Set.Empty;
+
+        // 验证 g 与截距 c 无关（分别取 c=0,1 后应严格相等）
+        var g0 = g.Exact.Substitute(interceptName, 0).Simplify();
+        var g1 = g.Exact.Substitute(interceptName, 1).Simplify();
+        var diffExact = (g0 - g1).Simplify();
+        // 注意：Providedf（"…provided …"）不能直接 EvalNumerical，用 Approx=0 走符号判定即可
+        var diffScalar = new ExactScalar(0, diffExact);
+        if (diffScalar.VerifyStrictZero() != StrictResult.StrictlyTrue)
+        {
+            // 与 c 有关：单条"斜率和为零"不能确定斜率（存在参数族）
+            return Entity.Set.Empty;
+        }
+
+        return MathS.Equality(g0, 0).Solve(slopeName);
+    }
+
+    /// <summary>【度量反解】已知弦斜率与 ∠PAQ 的 tan，求弦截距与三角形面积。</summary>
+    /// <param name="conic">圆锥曲线</param>
+    /// <param name="vertex">三角形顶点 A（不要求在曲线上）</param>
+    /// <param name="chordSlope">已知弦斜率</param>
+    /// <param name="tanTarget">目标 tan∠PAQ（正数）</param>
+    public static IReadOnlyList<TriangleAreaResult> SolveAreaFromTangent(
+        Conic conic, HPoint vertex, ExactScalar chordSlope, ExactScalar tanTarget,
+        string interceptName = "c")
+    {
+        var results = new List<TriangleAreaResult>();
+        var c = ExactScalar.FromSymbol(interceptName);
+
+        // 弦：y = chordSlope · x + c  =>  chordSlope·x − y + c = 0
+        var symbolicLine = new HLine(chordSlope, -1, c);
+        var pts = conic.Intersect(symbolicLine);
+        if (pts.Length < 2) return results;
+
+        var (px, py) = Metric.Vector(vertex, pts[0]);
+        var (qx, qy) = Metric.Vector(vertex, pts[1]);
+        var cross = px * qy - py * qx;
+        var dot = px * qx + py * qy;
+
+        // 平方去根号：tan² = cross²/dot²  =>  cross² − tan²·dot² = 0
+        var equation = (cross * cross - tanTarget * tanTarget * dot * dot).Simplified();
+        if (equation.Exact is null) return results;
+
+        var statement = MathS.Equality(equation.Exact.Expand().Simplify(), 0);
+        if (statement.Solve(interceptName) is not Entity.Set.FiniteSet roots) return results;
+
+        foreach (var root in roots)
+        {
+            if (root.EvalNumerical() is Entity.Number.Complex complex && !complex.ImaginaryPart.IsZero)
+                continue;
+
+            var cVal = new ExactScalar((double)root.EvalNumerical(), root.Simplify());
+            var concrete = conic.Intersect(new HLine(chordSlope, -1, cVal));
+            if (concrete.Length < 2) continue;
+
+            var tanActual = Metric.TanAngleUnsigned(
+                Metric.Vector(vertex, concrete[0]),
+                Metric.Vector(vertex, concrete[1]));
+
+            // 回验 tan（平方会引入符号歧义与退化增根，必须逐步验真）
+            if (tanActual is null) continue;
+            if ((tanActual.Value - tanTarget).VerifyStrictZero() != StrictResult.StrictlyTrue) continue;
+
+            results.Add(new TriangleAreaResult(
+                Intercept: cVal,
+                Area: Metric.TriangleArea(vertex, concrete[0], concrete[1]),
+                Tangent: tanActual.Value));
+        }
+
+        return results;
+    }
 }
+
+/// <summary>【度量反解】弦截距与三角形面积结果。</summary>
+public sealed record TriangleAreaResult(ExactScalar Intercept, ExactScalar Area, ExactScalar Tangent);
