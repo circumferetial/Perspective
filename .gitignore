@@ -17,3 +17,8 @@ __pycache__/
 # OS
 Thumbs.db
 .DS_Store
+
+# 内部流程/交流文档（仅本地保留，不公开）
+docs/gemini-consultations.md
+docs/handoff.md
+docs/backlog.md
