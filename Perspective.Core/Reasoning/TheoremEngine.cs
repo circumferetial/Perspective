@@ -67,8 +67,7 @@ public readonly struct ChordOfContactIsPolarRule : IFactRule<ChordOfContactIsPol
     public static int Apply(FactBase facts)
     {
         int count = 0;
-        var tangents = facts.Facts.OfType<TangentFact>().ToList();
-        var onLines = facts.Facts.OfType<OnLineFact>().ToList();
+        var tangents = facts.Tangents;
 
         for (int i = 0; i < tangents.Count; i++)
         {
@@ -78,9 +77,8 @@ public readonly struct ChordOfContactIsPolarRule : IFactRule<ChordOfContactIsPol
                 var t2 = tangents[j];
                 if (t1.ConicId != t2.ConicId || t1.TouchPointId == t2.TouchPointId) continue;
 
-                // 找两条切线的公共点 Q
-                var qIds = onLines.Where(f => f.LineId == t1.LineId).Select(f => f.PointId)
-                    .Intersect(onLines.Where(f => f.LineId == t2.LineId).Select(f => f.PointId))
+                // 找两条切线的公共点 Q = (T1 上的点) ∩ (T2 上的点)，排除切点
+                var qIds = facts.PointsOn(t1.LineId).Intersect(facts.PointsOn(t2.LineId))
                     .Where(pid => pid != t1.TouchPointId && pid != t2.TouchPointId)
                     .ToList();
 
@@ -117,8 +115,8 @@ public readonly struct ChordOfContactIsPolarRule : IFactRule<ChordOfContactIsPol
 
 /// <summary>
 /// 命题 2：La Hire 极点极线互反定理（Q 在 P 的极线上 => P 必在 Q 的极线上）
-/// 【前提】① 同一曲线的两条极线声明 L_P = C·P、L_Q = C·Q（SameLineStrictly 严通道
-///         回验，不信任 PolarOfFact 标签）；② Q ∈ L_P（信任 OnLineFact）；
+/// 【前提】① 同一曲线的两条极线声明 L_P = C·P、L_Q = C·Q（ConicTools.IsPolarLine
+///         严通道回验，不信任 PolarOfFact 标签）；② Q ∈ L_P（信任 OnLineFact）；
 ///         ③ P ∈ L_Q（严通道回验）。
 /// 【结论】OnLineFact(P, L_Q)。
 /// 【推导】C 对称 ⟹ Qᵀ(CP) = (QᵀCP)ᵀ = Pᵀ(CQ)，即配极关系对称：Q 在 P 的极线上
@@ -135,7 +133,7 @@ public readonly struct PolePolarReciprocityRule : IFactRule<PolePolarReciprocity
     public static int Apply(FactBase facts)
     {
         int count = 0;
-        var polars = facts.Facts.OfType<PolarOfFact>().ToList();
+        var polars = facts.Polars;
 
         foreach (var pFact in polars)
         {
@@ -147,7 +145,7 @@ public readonly struct PolePolarReciprocityRule : IFactRule<PolePolarReciprocity
                 // 绝大多数配对根本不含前提②，提前把它们筛掉，避免为每个配对都构造成本高昂的
                 // 极线表达式（实测 K=100 时该顺序差异约 1000 倍耗时 / 400 倍分配）。
                 // 前提：Q 在 P 的极线 L_P 上
-                if (!facts.Facts.Contains(new OnLineFact(qFact.PoleId, pFact.LineId))) continue;
+                if (!facts.HasOnLine(qFact.PoleId, pFact.LineId)) continue;
 
                 // 前提严通道回验：确认两条线确实分别是两极点的极线（不信任 PolarOfFact 标签）。
                 // 判据收敛在 ConicTools.IsPolarLine（与裁决器共用，避免两处实现漂移）。
@@ -193,30 +191,20 @@ public readonly struct HarmonicPolarBundleRule : IFactRule<HarmonicPolarBundleRu
     public static int Apply(FactBase facts)
     {
         int count = 0;
-        var polars = facts.Facts.OfType<PolarOfFact>().ToList();
-        var onLines = facts.Facts.OfType<OnLineFact>().ToList();
-        var onConics = facts.Facts.OfType<OnConicFact>().ToList();
+        var polars = facts.Polars;
 
         foreach (var polar in polars)
         {
             // 找所有过极点 Q 的直线（排除极线自己）
-            var secantIds = onLines
-                .Where(f => f.PointId == polar.PoleId && f.LineId != polar.LineId)
-                .Select(f => f.LineId)
-                .ToList();
+            var secantIds = facts.LinesThrough(polar.PoleId).Where(lid => lid != polar.LineId).ToList();
 
             foreach (var secId in secantIds)
             {
                 // 找交极线于 R
-                var rIds = onLines.Where(f => f.LineId == secId).Select(f => f.PointId)
-                    .Intersect(onLines.Where(f => f.LineId == polar.LineId).Select(f => f.PointId))
-                    .ToList();
+                var rIds = facts.PointsOn(secId).Intersect(facts.PointsOn(polar.LineId)).ToList();
 
                 // 找割线与曲线的两个交点 M, N
-                var mnIds = onLines.Where(f => f.LineId == secId).Select(f => f.PointId)
-                    .Intersect(onConics.Where(f => f.ConicId == polar.ConicId).Select(f => f.PointId))
-                    .Distinct()
-                    .ToList();
+                var mnIds = facts.PointsOn(secId).Intersect(facts.PointsOnConic(polar.ConicId)).ToList();
 
                 if (mnIds.Count < 2) continue;
 
@@ -267,9 +255,8 @@ public readonly struct ConicMidpointSlopeRule : IFactRule<ConicMidpointSlopeRule
     public static int Apply(FactBase facts)
     {
         int count = 0;
-        var centers = facts.Facts.OfType<CenterOfConicFact>().ToList();
-        var midpoints = facts.Facts.OfType<MidpointFact>().ToList();
-        var onConics = facts.Facts.OfType<OnConicFact>().ToList();
+        var centers = facts.Centers;
+        var midpoints = facts.Midpoints;
 
         foreach (var cen in centers)
         {
@@ -280,8 +267,8 @@ public readonly struct ConicMidpointSlopeRule : IFactRule<ConicMidpointSlopeRule
 
             foreach (var mid in midpoints)
             {
-                if (!onConics.Contains(new OnConicFact(mid.AId, cen.ConicId)) ||
-                    !onConics.Contains(new OnConicFact(mid.BId, cen.ConicId))) continue;
+                if (!facts.HasOnConic(mid.AId, cen.ConicId) ||
+                    !facts.HasOnConic(mid.BId, cen.ConicId)) continue;
 
                 // 前提严通道验真：M 确实严格是 AB 的中点，且 A、B 严格在曲线上。
                 // 不能只信任 MidpointFact / OnConicFact 标签，必须回验坐标。

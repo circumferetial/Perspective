@@ -122,14 +122,14 @@ public static class ProofJudge
 
     private static string? TryFindInFactBase(FactBase facts, GeoClaim claim)
     {
-        // 根据不同命题形态去 FactBase 里匹配对应的已证实事实，并取回它的推理出处
+        // 用事实库的类型视图做声明式匹配（不再对全表 OfType 扫描）
         GeoFact? matched = claim switch
         {
-            ClaimOnLine c => facts.Facts.FirstOrDefault(f => f is OnLineFact ol && ol == new OnLineFact(c.PointId, c.LineId)),
-            ClaimOnConic c => facts.Facts.FirstOrDefault(f => f is OnConicFact oc && oc == new OnConicFact(c.PointId, c.ConicId)),
-            ClaimTangent c => facts.Facts.FirstOrDefault(f => f is TangentFact tf && tf.LineId == c.LineId && tf.ConicId == c.ConicId),
-            ClaimPolarOf c => facts.Facts.FirstOrDefault(f => f is PolarOfFact pf && pf == new PolarOfFact(c.LineId, c.PoleId, c.ConicId)),
-            ClaimHarmonic c => facts.Facts.FirstOrDefault(f => f is HarmonicFact hf &&
+            ClaimOnLine c => facts.OnLines.FirstOrDefault(f => f == new OnLineFact(c.PointId, c.LineId)),
+            ClaimOnConic c => facts.OnConics.FirstOrDefault(f => f == new OnConicFact(c.PointId, c.ConicId)),
+            ClaimTangent c => facts.Tangents.FirstOrDefault(f => f.LineId == c.LineId && f.ConicId == c.ConicId),
+            ClaimPolarOf c => facts.Polars.FirstOrDefault(f => f == new PolarOfFact(c.LineId, c.PoleId, c.ConicId)),
+            ClaimHarmonic c => facts.Harmonics.FirstOrDefault(hf =>
                 ((hf.AId == c.AId && hf.BId == c.BId) || (hf.AId == c.BId && hf.BId == c.AId)) &&
                 ((hf.CId == c.CId && hf.DId == c.DId) || (hf.CId == c.DId && hf.DId == c.CId))),
             // 以下三种命题形态目前**没有**对应的事实类型（FactBase 尚无
