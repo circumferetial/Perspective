@@ -429,3 +429,100 @@ public readonly struct ConjugateDiameterBisectsChordRule : IFactRule<ConjugateDi
         return count;
     }
 }
+
+/// <summary>
+/// 命题 7：同一条直线上的三点共线。
+/// 【前提】① 存在直线 L，使 P1、P2、P3 都登记为 L 上的点（事实查询）；
+///         ② 严通道回验三点坐标确实共线（PointTools.Collinear），不信任标签。
+/// 【结论】CollinearFact(P1, P2, P3)（三元组规范排序后入库）。
+/// 【推导】由共线定义，三点同在一条直线上即为共线；这里额外做坐标级严通道回验，
+///         防止事实库被污染时推出错误结论。
+/// 【等级】Projective——共线是射影不变量。
+/// </summary>
+public readonly struct CollinearFromCommonLineRule : IFactRule<CollinearFromCommonLineRule>
+{
+    public static string Title => "同线三点共线";
+    public static TransformLevel RequiredLevel => TransformLevel.Projective;
+
+    public static int Apply(FactBase facts)
+    {
+        int count = 0;
+
+        foreach (var lineId in facts.LineIdsWithPoints)
+        {
+            var pts = facts.PointsOn(lineId).ToList();
+            if (pts.Count < 3) continue;
+
+            for (int i = 0; i < pts.Count; i++)
+            for (int j = i + 1; j < pts.Count; j++)
+            for (int k = j + 1; k < pts.Count; k++)
+            {
+                if (!facts.Points.TryGetValue(pts[i], out var a) ||
+                    !facts.Points.TryGetValue(pts[j], out var b) ||
+                    !facts.Points.TryGetValue(pts[k], out var c)) continue;
+
+                // 严通道回验：坐标确实共线
+                if (PointTools.Collinear(a, b, c) != StrictResult.StrictlyTrue) continue;
+
+                if (facts.AddFact(CollinearFact.Create(pts[i], pts[j], pts[k]),
+                    $"[{Title}] {pts[i]}, {pts[j]}, {pts[k]} 同在直线 {lineId} 上 => 三点共线"))
+                    count++;
+            }
+        }
+
+        return count;
+    }
+}
+
+/// <summary>
+/// 命题 8：过同一个点的三条直线共点。
+/// 【前提】① 存在点 P，使 L1、L2、L3 都登记为过 P 的直线（事实查询）；
+///         ② 三条线两两不重合（LineTools.Same 严通道排除退化的"三线"）；
+///         ③ 严通道回验三条线都严格经过 P（ContainsStrictly）。
+/// 【结论】ConcurrentFact(L1, L2, L3)（三元组规范排序后入库）。
+/// 【推导】三线共点的定义即三条互异直线交于同一点；平行线情形在射影视角下
+///         交于无穷远点，本规则同样成立。
+/// 【等级】Projective——共点是射影不变量。
+/// </summary>
+public readonly struct ConcurrentFromCommonPointRule : IFactRule<ConcurrentFromCommonPointRule>
+{
+    public static string Title => "同点三线共点";
+    public static TransformLevel RequiredLevel => TransformLevel.Projective;
+
+    public static int Apply(FactBase facts)
+    {
+        int count = 0;
+
+        foreach (var pointId in facts.PointIdsWithLines)
+        {
+            var lines = facts.LinesThrough(pointId).ToList();
+            if (lines.Count < 3) continue;
+            if (!facts.Points.TryGetValue(pointId, out var p)) continue;
+
+            for (int i = 0; i < lines.Count; i++)
+            for (int j = i + 1; j < lines.Count; j++)
+            for (int k = j + 1; k < lines.Count; k++)
+            {
+                if (!facts.Lines.TryGetValue(lines[i], out var l1) ||
+                    !facts.Lines.TryGetValue(lines[j], out var l2) ||
+                    !facts.Lines.TryGetValue(lines[k], out var l3)) continue;
+
+                // 三条线必须两两互异（重合线不能算作三线共点）
+                if (LineTools.Same(l1, l2) == StrictResult.StrictlyTrue
+                 || LineTools.Same(l1, l3) == StrictResult.StrictlyTrue
+                 || LineTools.Same(l2, l3) == StrictResult.StrictlyTrue) continue;
+
+                // 严通道回验：三条线都严格过 P
+                if (l1.ContainsStrictly(p) != StrictResult.StrictlyTrue) continue;
+                if (l2.ContainsStrictly(p) != StrictResult.StrictlyTrue) continue;
+                if (l3.ContainsStrictly(p) != StrictResult.StrictlyTrue) continue;
+
+                if (facts.AddFact(ConcurrentFact.Create(lines[i], lines[j], lines[k]),
+                    $"[{Title}] {lines[i]}, {lines[j]}, {lines[k]} 同过点 {pointId} => 三线共点"))
+                    count++;
+            }
+        }
+
+        return count;
+    }
+}

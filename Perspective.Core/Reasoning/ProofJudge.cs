@@ -132,11 +132,10 @@ public static class ProofJudge
             ClaimHarmonic c => facts.Harmonics.FirstOrDefault(hf =>
                 ((hf.AId == c.AId && hf.BId == c.BId) || (hf.AId == c.BId && hf.BId == c.AId)) &&
                 ((hf.CId == c.CId && hf.DId == c.DId) || (hf.CId == c.DId && hf.DId == c.CId))),
-            // 以下三种命题形态目前**没有**对应的事实类型（FactBase 尚无
-            // CollinearFact / PerpendicularFact / ParallelFact），所以不可能通过定理链命中，
-            // 只能落到代数预言机。一旦加入对应事实类型，必须在这里补映射，
-            // 否则会出现"规则推得出来、裁决器却看不见"的静默缺口。
-            ClaimCollinear => null,
+            // 共线已有对应事实类型（CollinearFact），在此映射；
+            // 垂直/平行仍无事实类型，只能落到代数预言机——一旦加入必须在此补映射，
+            // 否则会出现"规则推得出、裁决器看不见"的静默缺口。
+            ClaimCollinear c => facts.Collinears.FirstOrDefault(f => f == CollinearFact.Create(c.P1Id, c.P2Id, c.P3Id)),
             ClaimPerpendicular => null,
             ClaimParallel => null,
             _ => null

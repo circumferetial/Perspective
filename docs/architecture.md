@@ -47,6 +47,10 @@
 - 唯一写入入口 `FactBase.AddFact`，同时维护按类型视图与按 id 索引；
 - 规则用声明式查询表达前提（`LinesThrough`、`PointsOn`、`HasOnConic` 等），
   不手写全表扫描；
+- **幂集事实**（`CollinearFact` 三点共线、`ConcurrentFact` 三线共点）无法按单个 id
+  索引：去重靠**排序后的三元组规范键**（`Create` + `AddFact` 内规范化），检索靠
+  **按对索引第三元**（`ThirdPointsCollinearWith`、`ThirdLinesConcurrentWith`）。
+  新增同类事实时必须同时补"规范化 + 对索引"，否则会出现排列重复或检索退化；
 - 待证命题（`GeoClaim`）**不入 Facts**，防止循环论证；
   `ProofJudge` 先跑定理链，未命中再用代数预言机，并标注 `TrueByAlgebraOnly`
   仅表示"该坐标实现为真"，不等于"从前提可推"。

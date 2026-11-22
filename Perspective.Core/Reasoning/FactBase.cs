@@ -14,6 +14,36 @@ public sealed record PolarOfFact(string LineId, string PoleId, string ConicId) :
 public sealed record CenterOfConicFact(string CenterId, string ConicId) : GeoFact;
 public sealed record MidpointFact(string MidId, string AId, string BId) : GeoFact;
 public sealed record HarmonicFact(string AId, string BId, string CId, string DId) : GeoFact;
+
+/// <summary>
+/// 三点共线（幂集事实）。三个 id **必须按序规范化**（见 <see cref="Create"/>），
+/// 否则 (A,B,C) 与 (B,A,C) 会被当成两条事实。
+/// </summary>
+public sealed record CollinearFact(string P1Id, string P2Id, string P3Id) : GeoFact
+{
+    /// <summary>规范化构造：三个 id 排序后存放，保证排列去重。</summary>
+    public static CollinearFact Create(string a, string b, string c)
+    {
+        var ids = new[] { a, b, c };
+        Array.Sort(ids, StringComparer.Ordinal);
+        return new CollinearFact(ids[0], ids[1], ids[2]);
+    }
+}
+
+/// <summary>
+/// 三线共点（幂集事实）。三个 id **必须按序规范化**（见 <see cref="Create"/>）。
+/// </summary>
+public sealed record ConcurrentFact(string L1Id, string L2Id, string L3Id) : GeoFact
+{
+    /// <summary>规范化构造：三个 id 排序后存放，保证排列去重。</summary>
+    public static ConcurrentFact Create(string a, string b, string c)
+    {
+        var ids = new[] { a, b, c };
+        Array.Sort(ids, StringComparer.Ordinal);
+        return new ConcurrentFact(ids[0], ids[1], ids[2]);
+    }
+}
+
 public sealed record ConjugateDirectionsFact(string Line1Id, string Line2Id, string ConicId) : GeoFact;
 public sealed record ConstantSlopeProductFact(string Line1Id, string Line2Id, ExactScalar Value) : GeoFact;
 
@@ -45,6 +75,8 @@ public sealed class FactBase
     private readonly List<CenterOfConicFact> _centers = [];
     private readonly List<MidpointFact> _midpoints = [];
     private readonly List<HarmonicFact> _harmonics = [];
+    private readonly List<CollinearFact> _collinears = [];
+    private readonly List<ConcurrentFact> _concurrents = [];
     private readonly List<ConjugateDirectionsFact> _conjugateDirections = [];
     private readonly List<ConstantSlopeProductFact> _slopeProducts = [];
 
@@ -55,6 +87,8 @@ public sealed class FactBase
     public IReadOnlyList<CenterOfConicFact> Centers => _centers;
     public IReadOnlyList<MidpointFact> Midpoints => _midpoints;
     public IReadOnlyList<HarmonicFact> Harmonics => _harmonics;
+    public IReadOnlyList<CollinearFact> Collinears => _collinears;
+    public IReadOnlyList<ConcurrentFact> Concurrents => _concurrents;
     public IReadOnlyList<ConjugateDirectionsFact> ConjugateDirections => _conjugateDirections;
     public IReadOnlyList<ConstantSlopeProductFact> SlopeProducts => _slopeProducts;
 
@@ -66,6 +100,10 @@ public sealed class FactBase
     private readonly Dictionary<string, HashSet<string>> _conicsOfPoint = [];
     private readonly Dictionary<string, HashSet<string>> _pointsOnConic = [];
     private readonly Dictionary<string, List<PolarOfFact>> _polarsOfConic = [];
+
+    // 幂集事实（三点共线 / 三线共点）无法按单个 id 索引，按"对"索引第三元。
+    private readonly Dictionary<string, HashSet<string>> _thirdPointsByPair = [];
+    private readonly Dictionary<string, HashSet<string>> _thirdLinesByPair = [];
 
     public void AddPoint(string id, HPoint p) => Points[id] = p;
     public void AddLine(string id, HLine l) => Lines[id] = l;
@@ -107,14 +145,37 @@ public sealed class FactBase
     public bool HasOnConic(string pointId, string conicId) =>
         _conicsOfPoint.TryGetValue(pointId, out var s) && s.Contains(conicId);
 
+    /// <summary>已知两点，查与它们共线的第三点（幂集事实按"对"索引）。</summary>
+    public IReadOnlySet<string> ThirdPointsCollinearWith(string p1, string p2) =>
+        _thirdPointsByPair.TryGetValue(PairKey(p1, p2), out var s) ? s : EmptySet;
+
+    /// <summary>已知两线，查与它们共点的第三条线（幂集事实按"对"索引）。</summary>
+    public IReadOnlySet<string> ThirdLinesConcurrentWith(string l1, string l2) =>
+        _thirdLinesByPair.TryGetValue(PairKey(l1, l2), out var s) ? s : EmptySet;
+
+    /// <summary>已有直线 id（供规则枚举"每条线上的点"）。</summary>
+    public IEnumerable<string> LineIdsWithPoints => _pointsOnLine.Keys;
+
+    /// <summary>已有交点 id（供规则枚举"过每个点的线"）。</summary>
+    public IEnumerable<string> PointIdsWithLines => _linesThroughPoint.Keys;
+
     /// <summary>注册一条新事实（若已存在则忽略；返回 true 表示推出了新知识）。</summary>
     public bool AddFact(GeoFact fact, string trace)
     {
+        fact = Canonicalize(fact);
         if (!Facts.Add(fact)) return false;
         DerivationLog.Add((fact, trace));
         Index(fact);
         return true;
     }
+
+    /// <summary>幂集事实入库前规范化（三元组排序），保证排列去重。</summary>
+    private static GeoFact Canonicalize(GeoFact fact) => fact switch
+    {
+        CollinearFact f => CollinearFact.Create(f.P1Id, f.P2Id, f.P3Id),
+        ConcurrentFact f => ConcurrentFact.Create(f.L1Id, f.L2Id, f.L3Id),
+        _ => fact
+    };
 
     /// <summary>查找经过两点的既有直线；若场景里还没画，就自动辅助连一条并记录事实。</summary>
     public string GetOrCreateLine(string p1Id, string p2Id)
@@ -169,6 +230,20 @@ public sealed class FactBase
                 _harmonics.Add(f);
                 break;
 
+            case CollinearFact f:
+                _collinears.Add(f);
+                Bucket(_thirdPointsByPair, PairKey(f.P1Id, f.P2Id)).Add(f.P3Id);
+                Bucket(_thirdPointsByPair, PairKey(f.P1Id, f.P3Id)).Add(f.P2Id);
+                Bucket(_thirdPointsByPair, PairKey(f.P2Id, f.P3Id)).Add(f.P1Id);
+                break;
+
+            case ConcurrentFact f:
+                _concurrents.Add(f);
+                Bucket(_thirdLinesByPair, PairKey(f.L1Id, f.L2Id)).Add(f.L3Id);
+                Bucket(_thirdLinesByPair, PairKey(f.L1Id, f.L3Id)).Add(f.L2Id);
+                Bucket(_thirdLinesByPair, PairKey(f.L2Id, f.L3Id)).Add(f.L1Id);
+                break;
+
             case ConjugateDirectionsFact f:
                 _conjugateDirections.Add(f);
                 break;
@@ -185,4 +260,8 @@ public sealed class FactBase
             map[key] = set = [];
         return set;
     }
+
+    /// <summary>无序二元组的规范键（用于"按对索引第三元"）。</summary>
+    private static string PairKey(string a, string b) =>
+        string.CompareOrdinal(a, b) <= 0 ? a + "\u0001" + b : b + "\u0001" + a;
 }
