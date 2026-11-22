@@ -98,8 +98,10 @@
 `ElementInSet` 化简不可靠的短板**。但 Z3 只给判定、不产出人类可读区间，因此定位是
 **判定神谕**（当 `RealSets.Contains` 返回 `NoSymbolicData` 时兜底），不替代 `RealSets` 的表示。
 
-接入方式（待实施）：独立可选项目 `Perspective.Oracle.Z3`（Core 不引入原生依赖）+
-`IAlgebraicOracle` 接口；仅在需要时引用。
+接入方式（已实施 M1-a）：独立可选项目 `Perspective.Oracle.Z3`（Core 不引入原生依赖）+
+`IAlgebraicOracle` 接口；当前支持有理系数多项式约束的 ∃-QF 判定，
+根式/分母待正则化。**带量词的 NRA 不直接交给 Z3**（易 unknown），
+而是"候选生成 + 取反检查"。
 
 原则：**能库则库**；只有"现成库确实不支持且必须做"才标"不支持"，并且要在本文件登记原因。
 

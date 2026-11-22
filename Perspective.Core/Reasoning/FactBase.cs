@@ -108,6 +108,9 @@ public sealed class FactBase
     /// </summary>
     private readonly HashSet<string> _structuralPoints = [];
 
+    /// <summary>黑箱代数步骤记录（外部判定器的结论；不参与符号推导，仅供解释层引用）。</summary>
+    public List<OracleStep> OracleLog { get; } = [];
+
     /// <summary>推演诊断：截断、跳过的候选等"可能漏解"的提示（不静默）。</summary>
     public List<string> Diagnostics { get; } = [];
 

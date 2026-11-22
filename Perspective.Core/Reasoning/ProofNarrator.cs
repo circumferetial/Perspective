@@ -150,6 +150,26 @@ public static class ProofNarrator
              + $"三条主对角线 {concurrent.L1Id}、{concurrent.L2Id}、{concurrent.L3Id} 共点";
     }
 
+    /// <summary>
+    /// 渲染黑箱代数步骤：**只诚实描述"经判定器验证"，绝不编造数学步骤**。
+    /// </summary>
+    public static string RenderOracle(OracleStep step)
+    {
+        string constraints = step.Constraints.Count == 0
+            ? "无额外约束"
+            : string.Join("；", step.Constraints);
+
+        return step.Verdict switch
+        {
+            OracleVerdictKind.Unsat =>
+                $"在约束（{constraints}）下，由实代数判定器 {step.Solver} 验证不存在反例，故「{step.Claim}」成立",
+            OracleVerdictKind.Sat =>
+                $"在约束（{constraints}）下存在反例（{step.Model}），「{step.Claim}」不成立",
+            _ =>
+                $"实代数判定器 {step.Solver} 无法判定「{step.Claim}」（约束：{constraints}）"
+        };
+    }
+
     private static string Fallback(Derivation d) =>
         d.Note ?? "（推导记录不完整，无法渲染解释）";
 }

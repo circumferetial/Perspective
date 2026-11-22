@@ -15,6 +15,17 @@ public sealed record Derivation(
     string? Note = null);
 
 /// <summary>
+/// 黑箱代数步骤的一等记录：不解析判定器的内部推导，只诚实记录"在什么约束下、
+/// 由哪个判定器、得到什么结论"。解释层只能据此描述，不得伪造数学步骤。
+/// </summary>
+public sealed record OracleStep(
+    string Claim,
+    IReadOnlyList<string> Constraints,
+    string Solver,
+    OracleVerdictKind Verdict,
+    string? Model = null);
+
+/// <summary>
 /// 规则 id 常量：规则与解释层共用的稳定键，避免两边各写一份魔法字符串而漂移。
 /// </summary>
 public static class RuleIds

@@ -112,6 +112,19 @@
   pass2 只算新组合，pass3 0s）。
 - 缓存键用规则名 + 实体 id（坐标不随运行变化），缓存随 `FactBase` 生命周期自动失效。
 
+## 4g. 外部代数神谕（Oracle）的定位
+
+- **Core 只定义接口**：`IAlgebraicOracle` / `OracleVerdict`（无原生依赖）。
+  可选项目 `Perspective.Oracle.Z3` 引用 `Microsoft.Z3`，Core 与主测试不受污染。
+- **神谕只回答"可满足性"**：`DecideExists(变量, 约束)` → Unsat / Sat(模型) / Unknown。
+  全称命题通过取反归结（`DecideUniversal` = 检查"反正例"是否可满足）。
+- **不生成证明步骤**：结论记为一等节点 `OracleStep(claim, constraints, solver, verdict, model)`，
+  解释层只允许诚实描述（"经实代数判定不存在反例"），**禁止解析/编造判定器内部推导**。
+- **当前片段**：有理系数多项式（+−×、整数幂展开、除以有理常数）。
+  根式/变量分母等非多项式节点返回 `Unknown`，待 M1-c 用"新变量 + 平方约束"正则化。
+- **测试隔离**：`Perspective.Oracle.Z3.Tests` 独立成项目——Z3 原生库会显著拖慢
+  测试进程启动，不能污染 `Perspective.Tests` 的快速回归。
+
 ## 5. 事实模型
 
 - 事实用 `record` 以 ID 绑定，天然值等价去重；
