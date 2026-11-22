@@ -47,6 +47,9 @@ public sealed record ConcurrentFact(string L1Id, string L2Id, string L3Id) : Geo
 public sealed record ConjugateDirectionsFact(string Line1Id, string Line2Id, string ConicId) : GeoFact;
 public sealed record ConstantSlopeProductFact(string Line1Id, string Line2Id, ExactScalar Value) : GeoFact;
 
+/// <summary>非退化假设：<see cref="Expression"/> 不为零（不参与推导，只限定结论适用域）。</summary>
+public sealed record NonDegenerateAssumption(string Label, ExactScalar Expression);
+
 /// <summary>
 /// 几何场景知识库：存放几何实体、当前视角等级、已知事实及完整推演记录。
 /// <para>
@@ -67,6 +70,28 @@ public sealed class FactBase
     public HashSet<GeoFact> Facts { get; } = [];
     /// <summary>结构化证明记录（事实 ← 规则 ← 前提）。解释文本由 ProofNarrator 渲染。</summary>
     public List<Derivation> DerivationLog { get; } = [];
+
+    /// <summary>
+    /// 非退化假设（NDG）：几何证明里"任取的一般点不在某线上"这类前提无法证明，
+    /// 只能作为假设登记。它们不参与推导，只影响结论的适用条件。
+    /// </summary>
+    public List<NonDegenerateAssumption> Assumptions { get; } = [];
+
+    /// <summary>
+    /// 登记一条"某表达式不为零"的非退化假设。
+    /// 【一致性检查】若该表达式**恒为零**，说明在这些对象下假设必然失败（构形退化），
+    /// 返回 false 并不登记。
+    /// </summary>
+    public bool AssumeNonZero(ExactScalar expression, string label)
+    {
+        if (expression.VerifyStrictZero() == StrictResult.StrictlyTrue) return false;
+        Assumptions.Add(new NonDegenerateAssumption(label, expression));
+        return true;
+    }
+
+    /// <summary>登记"点不在直线上"（代入直线方程 ≠ 0）的非退化假设。</summary>
+    public bool AssumePointNotOnLine(HPoint point, HLine line, string label) =>
+        AssumeNonZero(line.A * point.X + line.B * point.Y + line.C * point.W, label);
 
     // --- 按类型的只读视图（由 AddFact 增量维护） ---
     private readonly List<OnLineFact> _onLines = [];
