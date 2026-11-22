@@ -34,7 +34,10 @@ public static class ConstraintLadder
                 1 => "过一点的直线束（1 维 = 线系）",
                 _ => nullity == 1 ? "唯一一条直线（0 维）" : "条件矛盾（无直线）"
             };
-            Console.WriteLine($"  加 {k} 个「点在线上」约束 → 解空间维数 {nullity}：{meaning}");
+            string dims = nullity > 0
+                ? $"线性维数 {nullity}（射影维数 {nullity - 1}）"
+                : "线性维数 0（无解）";
+            Console.WriteLine($"  加 {k} 个「点在线上」约束 → {dims}：{meaning}");
         }
 
         Console.WriteLine("\n=== 条件演化：圆锥曲线（线性系）===");
@@ -58,16 +61,37 @@ public static class ConstraintLadder
             Console.WriteLine($"    λ={lambda}: 是否仍过 4 点？{onAll}；det={c.Matrix.Determinant()}");
         }
 
-        // 再加第 5 个点（不在圆上）：λ 被线性方程唯一确定
-        var p5 = HPoint.FromCartesian(1, 1);
-        var v1 = Evaluate(c1, p5);
-        var v2 = Evaluate(c2, p5);
-        var lambdaStar = -(v1 / v2);
-        var unique = Pencil(c1, c2, lambdaStar);
-        var allFive = new[] { p1, p2, p3, p4, p5 }
-            .All(p => unique.ContainsStrictly(p) == StrictResult.StrictlyTrue);
+        // 再加第 5 个点：齐次参数 (λ1:λ2) 满足 λ1·v1 + λ2·v2 = 0。
+        // 不能直接假设 v2≠0：点可能落在 C2 上，此时唯一曲线就是 C2 本身（齐次解 (0:1)）。
+        var isZero = (Func<ExactScalar, bool>)(s => s.VerifyStrictZero() == StrictResult.StrictlyTrue);
 
-        Console.WriteLine($"  再加第 5 点 (1,1) ⇒ λ* = {lambdaStar}，唯一曲线，过全部 5 点？{allFive}");
+        void SolveFifthPoint(string label, HPoint p)
+        {
+            var v1 = Evaluate(c1, p);
+            var v2 = Evaluate(c2, p);
+
+            if (!isZero(v2))
+            {
+                var lambdaStar = -(v1 / v2);
+                var unique = Pencil(c1, c2, lambdaStar);
+                var ok = new[] { p1, p2, p3, p4, p }
+                    .All(q => unique.ContainsStrictly(q) == StrictResult.StrictlyTrue);
+                Console.WriteLine($"  再加第 5 点 {label} ⇒ λ* = {lambdaStar}，唯一曲线，过全部 5 点？{ok}");
+            }
+            else if (!isZero(v1))
+            {
+                var ok = new[] { p1, p2, p3, p4, p }
+                    .All(q => c2.ContainsStrictly(q) == StrictResult.StrictlyTrue);
+                Console.WriteLine($"  第 5 点 {label} 在 C2 上 ⇒ (λ1:λ2)=(0:1)，唯一曲线是 C2，过全部 5 点？{ok}");
+            }
+            else
+            {
+                Console.WriteLine($"  第 5 点 {label} 落在整族上（C1、C2 都过它）⇒ 条件未进一步约束，仍是曲线系");
+            }
+        }
+
+        SolveFifthPoint("(1,1)", HPoint.FromCartesian(1, 1));
+        SolveFifthPoint("(2,−1)（边界：在 C2 上）", HPoint.FromCartesian(2, -1));
         Console.WriteLine("  （λ 的取值就是「约束如何选出一条具体曲线」的演化结果）");
     }
 

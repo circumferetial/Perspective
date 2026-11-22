@@ -31,6 +31,20 @@ public static class GrassmannExperiment
         Console.WriteLine($"  Plücker 关系 p01·p23 − p02·p13 + p03·p12 = " +
                           $"{line.P01 * line.P23 - line.P02 * line.P13 + line.P03 * line.P12}（恒为 0，无需额外约束）");
 
+        // 自检：对 Z≠0 的一般点也验证 Plücker 恒等式（防止 P23 之类笔误被特殊点掩盖）
+        var lineBC = Join(b, c);
+        var lineCA = Join(c, a);
+        CheckPlucker(line);
+        CheckPlucker(lineBC);
+        CheckPlucker(lineCA);
+        Console.WriteLine($"  一般位置直线也通过 Plücker 自检：bc={FmtPlucker(lineBC)}；ca={FmtPlucker(lineCA)}");
+        CheckJoinAgainstManual();
+
+        // 关联自检：bc 的中点应在线 bc 上
+        var mid = new Vec4(
+            b.X + c.X, b.Y + c.Y, b.Z + c.Z, b.W + c.W);
+        Console.WriteLine($"  bc 中点是否在 bc 线上？{IsZero(Wedge3(mid, b, c))}");
+
         // 关联：点 c 在线上 ⇔ 楔积 p∧a∧b = 0（四分量全零）
         var onLine = Wedge3(c, a, b);
         Console.WriteLine($"  c 是否在 a,b 的线上？{IsZero(onLine)}（楔积 {Fmt(onLine)}）");
@@ -94,7 +108,7 @@ public static class GrassmannExperiment
 
     private static Plucker6 Join(Vec4 a, Vec4 b) => new(
         a.X * b.Y - a.Y * b.X, a.X * b.Z - a.Z * b.X, a.X * b.W - a.W * b.X,
-        a.Y * b.Z - a.Z * b.Y, a.Y * b.W - a.W * b.Y, a.Z * b.W - a.Z * b.W);
+        a.Y * b.Z - a.Z * b.Y, a.Y * b.W - a.W * b.Y, a.Z * b.W - a.W * b.Z);
 
     /// <summary>三向量楔积（四分量），用于"平面"（对偶 4 向量）与"点在线上"的零判定。</summary>
     private static Vec4 Wedge3(Vec4 a, Vec4 b, Vec4 c) => new(
@@ -113,6 +127,38 @@ public static class GrassmannExperiment
         v.Y.VerifyStrictZero() == StrictResult.StrictlyTrue &&
         v.Z.VerifyStrictZero() == StrictResult.StrictlyTrue &&
         v.W.VerifyStrictZero() == StrictResult.StrictlyTrue;
+
+    /// <summary>用一般位置点（所有分量非零）逐分量对照手算结果，防止"特殊点把笔误掩盖"。</summary>
+    private static void CheckJoinAgainstManual()
+    {
+        var g1 = new Vec4(1, 2, 3, 4);
+        var g2 = new Vec4(5, 6, 7, 8);
+        var l = Join(g1, g2);
+        var expected = new[]
+        {
+            1 * 6 - 2 * 5, 1 * 7 - 3 * 5, 1 * 8 - 4 * 5,
+            2 * 7 - 3 * 6, 2 * 8 - 4 * 6, 3 * 8 - 4 * 7
+        };
+        var actual = new[] { l.P01, l.P02, l.P03, l.P12, l.P13, l.P23 };
+        for (int i = 0; i < 6; i++)
+        {
+            var diff = actual[i] - ExactScalar.FromInt(expected[i]);
+            if (diff.VerifyStrictZero() != StrictResult.StrictlyTrue)
+                throw new InvalidOperationException(
+                    $"Join 分量 P{i} 与手算不符：{actual[i]} ≠ {expected[i]}");
+        }
+        Console.WriteLine("  Join 分量与手算逐项一致（一般位置点：Z≠0、W≠0）");
+    }
+
+    private static void CheckPlucker(Plucker6 l)
+    {
+        var relation = l.P01 * l.P23 - l.P02 * l.P13 + l.P03 * l.P12;
+        if (relation.VerifyStrictZero() != StrictResult.StrictlyTrue)
+            throw new InvalidOperationException($"Plücker 恒等式失败：{relation}");
+    }
+
+    private static string FmtPlucker(Plucker6 l) =>
+        $"({l.P01},{l.P02},{l.P03},{l.P12},{l.P13},{l.P23})";
 
     private static string Fmt(Vec4 v) => $"({v.X}, {v.Y}, {v.Z}, {v.W})";
     private static string Fmt(HPoint p) => $"({p.X}, {p.Y}, {p.W})";
