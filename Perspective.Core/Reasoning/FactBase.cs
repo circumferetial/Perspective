@@ -64,6 +64,42 @@ public sealed record PerpendicularFact(string Line1Id, string Line2Id) : GeoFact
 }
 
 /// <summary>
+/// 代数关系事实（**终端专用**）：任意"表达式 关系 0"的结论，以规范化后的表达式为数据。
+/// <para>
+/// 【为什么需要】题目会出现"某组合相加为定值，再除以系数仍是定值"这类无穷变体，
+/// 不可能为每个组合定义事实类型。这里把**表达式本身**作为事实内容，规范化后去重。
+/// </para>
+/// <para>
+/// 【定位】只作终端结论（证明/证伪展示），**不参与组合型规则的候选枚举**，
+/// 避免长尾事实污染 Pascal/四点形等组合规则。
+/// </para>
+/// <para>
+/// 【规范化】存储的是"左 − 右"经 Simplify 后的字符串；等价表达式若化到同一规范形即去重。
+/// 不保证任意等价表达式都同形（这是当前限制，必要时可接判定器）。
+/// </para>
+/// </summary>
+public sealed record AlgebraicRelationFact(string LeftNormalized, string RightNormalized, RelationKind Kind) : GeoFact
+{
+    /// <summary>
+    /// 由左右表达式构造并严格验证（仅支持等式：左 − 右 ≡ 0）。
+    /// 返回 null 表示无法精确化或并不恒等（拒绝把假命题写成事实）。
+    /// </summary>
+    public static AlgebraicRelationFact? Create(ExactScalar left, ExactScalar right)
+    {
+        var difference = (left - right).Simplified();
+        if (difference.Exact is null) return null;
+        if (difference.VerifyStrictZero() != StrictResult.StrictlyTrue) return null;
+
+        return new AlgebraicRelationFact(
+            left.Exact!.Simplify().ToString(),
+            right.Exact!.Simplify().ToString(),
+            RelationKind.Equal);
+    }
+
+    public bool IsEquality => Kind == RelationKind.Equal;
+}
+
+/// <summary>
 /// 面积比（仿射不变量）：S(A1A2A3)/S(B1B2B3) = Value（三角形顶点顺序无关，内部排序去重）。
 /// 约定用**无向面积**（正值），验证用 area²·r² 的消根号形式。
 /// </summary>
@@ -292,6 +328,7 @@ public sealed class FactBase
     private readonly List<AreaRatioFact> _areaRatios = [];
     private readonly List<SegmentRatioFact> _segmentRatios = [];
     private readonly List<CrossRatioFact> _crossRatios = [];
+    private readonly List<AlgebraicRelationFact> _algebraicRelations = [];
 
     public IReadOnlyList<OnLineFact> OnLines => _onLines;
     public IReadOnlyList<OnConicFact> OnConics => _onConics;
@@ -310,6 +347,7 @@ public sealed class FactBase
     public IReadOnlyList<AreaRatioFact> AreaRatios => _areaRatios;
     public IReadOnlyList<SegmentRatioFact> SegmentRatios => _segmentRatios;
     public IReadOnlyList<CrossRatioFact> CrossRatios => _crossRatios;
+    public IReadOnlyList<AlgebraicRelationFact> AlgebraicRelations => _algebraicRelations;
 
     // --- 按 id 的索引（同上，由 AddFact 增量维护） ---
     private static readonly IReadOnlySet<string> EmptySet = new HashSet<string>();
@@ -570,6 +608,10 @@ public sealed class FactBase
                 _crossRatios.Add(f);
                 BucketList(_crossRatiosByPair, PairKey(f.A, f.B)).Add(f);
                 BucketList(_crossRatiosByPair, PairKey(f.C, f.D)).Add(f);
+                break;
+
+            case AlgebraicRelationFact f:
+                _algebraicRelations.Add(f);
                 break;
         }
     }

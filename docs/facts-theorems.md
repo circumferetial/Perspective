@@ -36,8 +36,12 @@
 | `AreaRatioFact` | A1,A2,A3, B1,B2,B3, Value | S(A1A2A3)/S(B1B2B3) = Value | Affine | 三角形顶点排序去重；按三角形索引 |
 | `SegmentRatioFact` | A1,A2, B1,B2, Value | \|A1A2\|/\|B1B2\| = Value | Similarity | 端点排序去重；按线段索引 |
 | `CrossRatioFact` | A,B,C,D, Value | (A,B;C,D) = Value | Projective | 4 元子群规范化（换对取倒数）；按点对索引 |
+| `AlgebraicRelationFact` | LeftNorm, RightNorm, Kind | 任意"表达式 关系 表达式"（**终端专用**） | — | 规范化字符串去重；不参与组合枚举 |
 
-## 2. 定理规则（当前 11 条）
+**终端专用事实**：`AlgebraicRelationFact` 只用于表达"某表达式为定值/等于另一表达式"这类
+长尾结论，不进入组合型规则的候选枚举（防爆炸）；新增其它终端事实时也应遵守这条。
+
+## 2. 定理规则（当前 17 条）
 
 | # | 规则 | 前提 | 结论 | 等级 | 说明 |
 |---|---|---|---|---|---|
@@ -60,6 +64,9 @@
 | 17 | 线段比传递 | 两条 `SegmentRatioFact`（共享线段） | `SegmentRatioFact` | Similarity | 平方形式回验（无根号） |
 
 ## 3. 已知缺口（按优先级）
+
+> 说明：比例/角度/平行/垂直事实已补齐（P1-4）。当前主要缺口是"长尾定值组合"的
+> 通用载体（已由 `AlgebraicRelationFact` 覆盖终端情形）与跨模型定理搬运。
 
 ### 3.1 度量/比例类事实（已全部补齐）
 
