@@ -121,6 +121,14 @@ public readonly record struct ExactScalar(double Approx, Entity? Exact)
         double approx = x.Approx <= 0 ? 0 : System.Math.Sqrt(x.Approx);
         return new ExactScalar(approx, null);
     }
+    /// <summary>精确余弦（保留符号基因，如 cos(pi/4) → sqrt(2)/2）</summary>
+    public static ExactScalar Cos(ExactScalar x) =>
+        new(System.Math.Cos(x.Approx), x.Exact is not null ? AngouriMath.MathS.Cos(x.Exact) : null);
+
+    /// <summary>精确正弦（保留符号基因，如 sin(pi/6) → 1/2）</summary>
+    public static ExactScalar Sin(ExactScalar x) =>
+        new(System.Math.Sin(x.Approx), x.Exact is not null ? AngouriMath.MathS.Sin(x.Exact) : null);
+
     // --- 快通道与严通道 ---
 
     /// <summary>【快通道】仅用于画图渲染、判断无穷远、初步吸附筛选</summary>
