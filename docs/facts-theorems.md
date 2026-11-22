@@ -33,6 +33,9 @@
 | `ParallelFact` | Line1Id, Line2Id | 两线平行（不重合） | Affine | **排序二元组** + 双向索引 |
 | `PerpendicularFact` | Line1Id, Line2Id | 两线垂直 | Similarity | **排序二元组** + 双向索引 |
 | `AngleEqualFact` | A1, A2, B1, B2, Sign | 有向角 θ(A1,A2) ≡ Sign·θ(B1,B2) mod π | Similarity | 对内排序 + 对间排序 + Sign；按线对索引 |
+| `AreaRatioFact` | A1,A2,A3, B1,B2,B3, Value | S(A1A2A3)/S(B1B2B3) = Value | Affine | 三角形顶点排序去重；按三角形索引 |
+| `SegmentRatioFact` | A1,A2, B1,B2, Value | \|A1A2\|/\|B1B2\| = Value | Similarity | 端点排序去重；按线段索引 |
+| `CrossRatioFact` | A,B,C,D, Value | (A,B;C,D) = Value | Projective | 4 元子群规范化（换对取倒数）；按点对索引 |
 
 ## 2. 定理规则（当前 11 条）
 
@@ -53,10 +56,12 @@
 | 13 | 垂直与平行相容 | `PerpendicularFact` + `ParallelFact` | `PerpendicularFact` | Similarity | 垂直非仿射不变量 |
 | 14 | 平行线的对应角相等 | `ParallelFact` | `AngleEqualFact` | Similarity | θ(L₁,M) ≡ θ(L₂,M) |
 | 15 | 角相等传递 | 两条 `AngleEqualFact`（共享线对） | `AngleEqualFact` | Similarity | 符号相乘：s₁·s₂ |
+| 16 | 面积比传递 | 两条 `AreaRatioFact`（共享三角形） | `AreaRatioFact` | Affine | S₁/S₂·S₂/S₃ |
+| 17 | 线段比传递 | 两条 `SegmentRatioFact`（共享线段） | `SegmentRatioFact` | Similarity | 平方形式回验（无根号） |
 
 ## 3. 已知缺口（按优先级）
 
-### 3.1 度量/比例类事实（角度已补，比例仍缺）
+### 3.1 度量/比例类事实（已全部补齐）
 
 | 计划事实 | 含义 | 等级 | 注意 |
 |---|---|---|---|

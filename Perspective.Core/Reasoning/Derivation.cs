@@ -55,4 +55,8 @@ public static class RuleIds
     public const string AngleFromParallel = "angle-from-parallel";
 
     public const string AngleTransitivity = "angle-transitivity";
+
+    public const string AreaRatioTransitivity = "area-ratio-transitivity";
+
+    public const string SegmentRatioTransitivity = "segment-ratio-transitivity";
 }

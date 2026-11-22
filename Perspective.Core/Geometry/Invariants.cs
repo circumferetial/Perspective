@@ -88,6 +88,42 @@ public static class GeometryAudit
 
     }
     /// <summary>
+    /// 严格检验面积比：S(A1A2A3)/S(B1B2B3) = value（无向面积，正值）。
+    /// 【判据】area1 = value·area2（两句都用面积两倍绝对值，消去 1/2）。
+    /// 分母三角形退化（面积恒为 0）时返回 StrictlyFalse。
+    /// </summary>
+    public static StrictResult IsAreaRatio(
+        HPoint a1, HPoint a2, HPoint a3,
+        HPoint b1, HPoint b2, HPoint b3,
+        ExactScalar value)
+    {
+        var area1 = Metric.TriangleArea2(a1, a2, a3);
+        var area2 = Metric.TriangleArea2(b1, b2, b3);
+
+        if (area2.VerifyStrictZero() == StrictResult.StrictlyTrue) return StrictResult.StrictlyFalse;
+        return (area1 - value * area2).VerifyStrictZero();
+    }
+
+    /// <summary>
+    /// 严格检验线段比：|A1A2|/|B1B2| = value（相似不变量）。
+    /// 【判据】用平方形式 |A1A2|² = value²·|B1B2|²，无根号；分母线段退化时返回 StrictlyFalse。
+    /// </summary>
+    public static StrictResult IsSegmentRatio(
+        HPoint a1, HPoint a2, HPoint b1, HPoint b2, ExactScalar value)
+    {
+        var squared1 = Metric.DistanceSquared(a1, a2);
+        var squared2 = Metric.DistanceSquared(b1, b2);
+
+        if (squared2.VerifyStrictZero() == StrictResult.StrictlyTrue) return StrictResult.StrictlyFalse;
+        return (squared1 - value * value * squared2).VerifyStrictZero();
+    }
+
+    /// <summary>严格检验交比：(A,B;C,D) = value（射影不变量）。</summary>
+    public static StrictResult IsCrossRatio(
+        HPoint a, HPoint b, HPoint c, HPoint d, ExactScalar value) =>
+        (CrossRatio(a, b, c, d) - value).VerifyStrictZero();
+
+    /// <summary>
     /// 严格检验"有向角相等（mod π）"：θ(a1,a2) ≡ sign·θ(b1,b2)。
     /// 【判据】tan θ = cross/dot；θ₁ = sign·θ₂ ⇔ cross₁·dot₂ − sign·cross₂·dot₁ = 0
     /// （tan 为奇函数；直角时 dot=0，判据仍然正确：一侧直角另一侧非直角时不可能成立）。

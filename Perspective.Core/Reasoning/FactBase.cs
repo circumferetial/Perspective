@@ -64,6 +64,77 @@ public sealed record PerpendicularFact(string Line1Id, string Line2Id) : GeoFact
 }
 
 /// <summary>
+/// 面积比（仿射不变量）：S(A1A2A3)/S(B1B2B3) = Value（三角形顶点顺序无关，内部排序去重）。
+/// 约定用**无向面积**（正值），验证用 area²·r² 的消根号形式。
+/// </summary>
+public sealed record AreaRatioFact(
+    string A1, string A2, string A3,
+    string B1, string B2, string B3,
+    ExactScalar Value) : GeoFact
+{
+    public static AreaRatioFact Create(
+        string a1, string a2, string a3, string b1, string b2, string b3, ExactScalar value)
+    {
+        var (x, y, z) = Sort3(a1, a2, a3);
+        var (u, v, w) = Sort3(b1, b2, b3);
+        return new(x, y, z, u, v, w, value.Simplified());
+    }
+
+    private static (string, string, string) Sort3(string a, string b, string c)
+    {
+        var ids = new[] { a, b, c };
+        Array.Sort(ids, string.CompareOrdinal);
+        return (ids[0], ids[1], ids[2]);
+    }
+}
+
+/// <summary>
+/// 线段比（相似不变量）：|A1A2|/|B1B2| = Value（端点顺序无关）。
+/// 验证用平方形式 |A1A2|² = r²·|B1B2|²（无根号），要求分母线段非退化。
+/// </summary>
+public sealed record SegmentRatioFact(
+    string A1, string A2, string B1, string B2, ExactScalar Value) : GeoFact
+{
+    public static SegmentRatioFact Create(
+        string a1, string a2, string b1, string b2, ExactScalar value)
+    {
+        var (x, y) = Sort2(a1, a2);
+        var (u, v) = Sort2(b1, b2);
+        return new(x, y, u, v, value.Simplified());
+    }
+
+    private static (string, string) Sort2(string a, string b) =>
+        string.CompareOrdinal(a, b) <= 0 ? (a, b) : (b, a);
+}
+
+/// <summary>
+/// 交比（射影不变量）：(A,B;C,D) = Value。
+/// 规范化利用 4 元子群：对内换序取倒数，交换两对不变；对间按字典序排列。
+/// </summary>
+public sealed record CrossRatioFact(
+    string A, string B, string C, string D, ExactScalar Value) : GeoFact
+{
+    public static CrossRatioFact Create(string a, string b, string c, string d, ExactScalar value)
+    {
+        bool swapA = string.CompareOrdinal(a, b) > 0;
+        bool swapC = string.CompareOrdinal(c, d) > 0;
+
+        var (x, y) = swapA ? (b, a) : (a, b);
+        var (u, v) = swapC ? (d, c) : (c, d);
+
+        var normalized = value;
+        if (swapA ^ swapC)
+            normalized = (ExactScalar.FromInt(1) / value).Simplified();  // 交换一对取倒数
+
+        // 两对按字典序排列（交换两对不改变交比）
+        if (string.CompareOrdinal(x, u) > 0 || (x == u && string.CompareOrdinal(y, v) > 0))
+            (x, y, u, v) = (u, v, x, y);
+
+        return new(x, y, u, v, normalized);
+    }
+}
+
+/// <summary>
 /// 有向角相等（mod π）：θ(A1,A2) ≡ Sign·θ(B1,B2) (mod π)。
 /// <para>
 /// 【规范化】每对线内部按 id 排序（换序使角取负 → 记入 Sign），
@@ -218,6 +289,9 @@ public sealed class FactBase
     private readonly List<ParallelFact> _parallels = [];
     private readonly List<PerpendicularFact> _perpendiculars = [];
     private readonly List<AngleEqualFact> _angleEquals = [];
+    private readonly List<AreaRatioFact> _areaRatios = [];
+    private readonly List<SegmentRatioFact> _segmentRatios = [];
+    private readonly List<CrossRatioFact> _crossRatios = [];
 
     public IReadOnlyList<OnLineFact> OnLines => _onLines;
     public IReadOnlyList<OnConicFact> OnConics => _onConics;
@@ -233,6 +307,9 @@ public sealed class FactBase
     public IReadOnlyList<ParallelFact> Parallels => _parallels;
     public IReadOnlyList<PerpendicularFact> Perpendiculars => _perpendiculars;
     public IReadOnlyList<AngleEqualFact> AngleEquals => _angleEquals;
+    public IReadOnlyList<AreaRatioFact> AreaRatios => _areaRatios;
+    public IReadOnlyList<SegmentRatioFact> SegmentRatios => _segmentRatios;
+    public IReadOnlyList<CrossRatioFact> CrossRatios => _crossRatios;
 
     // --- 按 id 的索引（同上，由 AddFact 增量维护） ---
     private static readonly IReadOnlySet<string> EmptySet = new HashSet<string>();
@@ -245,6 +322,9 @@ public sealed class FactBase
     private readonly Dictionary<string, HashSet<string>> _linesParallelTo = [];
     private readonly Dictionary<string, HashSet<string>> _linesPerpendicularTo = [];
     private readonly Dictionary<string, List<AngleEqualFact>> _anglesByPair = [];
+    private readonly Dictionary<string, List<AreaRatioFact>> _areaRatiosByTriangle = [];
+    private readonly Dictionary<string, List<SegmentRatioFact>> _segmentRatiosBySegment = [];
+    private readonly Dictionary<string, List<CrossRatioFact>> _crossRatiosByPair = [];
 
     // 幂集事实（三点共线 / 三线共点）无法按单个 id 索引，按"对"索引第三元。
     private readonly Dictionary<string, HashSet<string>> _thirdPointsByPair = [];
@@ -328,6 +408,18 @@ public sealed class FactBase
     public IReadOnlyList<AngleEqualFact> AnglesInvolving(string line1, string line2) =>
         _anglesByPair.TryGetValue(PairKey(line1, line2), out var list) ? list : [];
 
+    /// <summary>包含指定三角形的所有面积比事实（任一侧）。</summary>
+    public IReadOnlyList<AreaRatioFact> AreaRatiosWith(string a, string b, string c) =>
+        _areaRatiosByTriangle.TryGetValue(TripleKey(a, b, c), out var list) ? list : [];
+
+    /// <summary>包含指定线段的所有线段比事实（任一侧）。</summary>
+    public IReadOnlyList<SegmentRatioFact> SegmentRatiosWith(string a, string b) =>
+        _segmentRatiosBySegment.TryGetValue(PairKey(a, b), out var list) ? list : [];
+
+    /// <summary>包含指定点对的所有交比事实（任一侧）。</summary>
+    public IReadOnlyList<CrossRatioFact> CrossRatiosWith(string a, string b) =>
+        _crossRatiosByPair.TryGetValue(PairKey(a, b), out var list) ? list : [];
+
     /// <summary>注册一条新事实（无规则出处：初始条件 / 辅助连线；解释由 Note 承担）。</summary>
     public bool AddFact(GeoFact fact, string note) =>
         AddFactCore(fact, new Derivation(RuleIds.AdHoc, fact, [], note));
@@ -363,6 +455,9 @@ public sealed class FactBase
         PerpendicularFact f => PerpendicularFact.Create(f.Line1Id, f.Line2Id),
         // 注意：Create 会按 id 顺序重推符号，这里必须保留原有 Sign
         AngleEqualFact f => AngleEqualFact.CreateExplicit(f.A1, f.A2, f.B1, f.B2, f.Sign),
+        AreaRatioFact f => AreaRatioFact.Create(f.A1, f.A2, f.A3, f.B1, f.B2, f.B3, f.Value),
+        SegmentRatioFact f => SegmentRatioFact.Create(f.A1, f.A2, f.B1, f.B2, f.Value),
+        CrossRatioFact f => CrossRatioFact.Create(f.A, f.B, f.C, f.D, f.Value),
         _ => fact
     };
 
@@ -458,6 +553,24 @@ public sealed class FactBase
                 BucketList(_anglesByPair, PairKey(f.A1, f.A2)).Add(f);
                 BucketList(_anglesByPair, PairKey(f.B1, f.B2)).Add(f);
                 break;
+
+            case AreaRatioFact f:
+                _areaRatios.Add(f);
+                BucketList(_areaRatiosByTriangle, TripleKey(f.A1, f.A2, f.A3)).Add(f);
+                BucketList(_areaRatiosByTriangle, TripleKey(f.B1, f.B2, f.B3)).Add(f);
+                break;
+
+            case SegmentRatioFact f:
+                _segmentRatios.Add(f);
+                BucketList(_segmentRatiosBySegment, PairKey(f.A1, f.A2)).Add(f);
+                BucketList(_segmentRatiosBySegment, PairKey(f.B1, f.B2)).Add(f);
+                break;
+
+            case CrossRatioFact f:
+                _crossRatios.Add(f);
+                BucketList(_crossRatiosByPair, PairKey(f.A, f.B)).Add(f);
+                BucketList(_crossRatiosByPair, PairKey(f.C, f.D)).Add(f);
+                break;
         }
     }
 
@@ -478,4 +591,12 @@ public sealed class FactBase
     /// <summary>无序二元组的规范键（用于"按对索引第三元"）。</summary>
     private static string PairKey(string a, string b) =>
         string.CompareOrdinal(a, b) <= 0 ? a + "\u0001" + b : b + "\u0001" + a;
+
+    /// <summary>无序三元组的规范键（面积比的三角形索引）。</summary>
+    private static string TripleKey(string a, string b, string c)
+    {
+        var ids = new[] { a, b, c };
+        Array.Sort(ids, string.CompareOrdinal);
+        return string.Join("\u0001", ids);
+    }
 }

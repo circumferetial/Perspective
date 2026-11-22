@@ -1248,3 +1248,114 @@ public readonly struct AngleTransitivityRule : IFactRule<AngleTransitivityRule>
         return count;
     }
 }
+/// <summary>
+/// 命题 16：面积比传递（S₁/S₂=r₁ 且 S₂/S₃=r₂ ⇒ S₁/S₃=r₁·r₂）。
+/// 【前提】两条 AreaRatioFact（共享三角形）；严通道回验结论。
+/// 【等级】Affine——面积比是仿射不变量。
+/// </summary>
+public readonly struct AreaRatioTransitivityRule : IFactRule<AreaRatioTransitivityRule>
+{
+    public static string Title => "面积比传递";
+    public static TransformLevel RequiredLevel => TransformLevel.Affine;
+    public static Type[] ConclusionTypes => [typeof(AreaRatioFact)];
+    public static Type[] PremiseTypes => [typeof(AreaRatioFact)];
+
+    public static int Apply(FactBase facts)
+    {
+        int count = 0;
+        foreach (var first in facts.AreaRatios.ToList())
+        {
+            foreach (var second in facts.AreaRatiosWith(first.B1, first.B2, first.B3).ToList())
+            {
+                if (ReferenceEquals(second, first)) continue;
+
+                if (second.A1 == first.B1 && second.A2 == first.B2 && second.A3 == first.B3)
+                {
+                    // S₁/S₂=r₁，S₂/S₃=r₂ ⇒ S₁/S₃ = r₁·r₂
+                    count += TryAdd(facts, first, second, first.Value * second.Value,
+                        first.A1, first.A2, first.A3, second.B1, second.B2, second.B3);
+                }
+                else if (second.B1 == first.B1 && second.B2 == first.B2 && second.B3 == first.B3)
+                {
+                    // S₃/S₂=r₂ ⇒ S₂/S₃ = 1/r₂
+                    if (second.Value.VerifyStrictZero() == StrictResult.StrictlyTrue) continue;
+                    count += TryAdd(facts, first, second, first.Value / second.Value,
+                        first.A1, first.A2, first.A3, second.A1, second.A2, second.A3);
+                }
+            }
+        }
+        return count;
+    }
+
+    private static int TryAdd(
+        FactBase facts, AreaRatioFact first, AreaRatioFact second, ExactScalar value,
+        string a1, string a2, string a3, string b1, string b2, string b3)
+    {
+        if (!facts.Points.TryGetValue(a1, out var pa1) ||
+            !facts.Points.TryGetValue(a2, out var pa2) ||
+            !facts.Points.TryGetValue(a3, out var pa3) ||
+            !facts.Points.TryGetValue(b1, out var pb1) ||
+            !facts.Points.TryGetValue(b2, out var pb2) ||
+            !facts.Points.TryGetValue(b3, out var pb3)) return 0;
+
+        if (GeometryAudit.IsAreaRatio(pa1, pa2, pa3, pb1, pb2, pb3, value) != StrictResult.StrictlyTrue)
+            return 0;
+
+        var candidate = AreaRatioFact.Create(a1, a2, a3, b1, b2, b3, value);
+        return facts.AddDerivedFact(candidate, RuleIds.AreaRatioTransitivity, first, second) ? 1 : 0;
+    }
+}
+
+/// <summary>
+/// 命题 17：线段比传递（|AB|/|CD|=r₁ 且 |CD|/|EF|=r₂ ⇒ |AB|/|EF|=r₁·r₂）。
+/// 【前提】两条 SegmentRatioFact（共享线段）；严通道回验（平方形式，无根号）。
+/// 【等级】Similarity——长度比是相似不变量。
+/// </summary>
+public readonly struct SegmentRatioTransitivityRule : IFactRule<SegmentRatioTransitivityRule>
+{
+    public static string Title => "线段比传递";
+    public static TransformLevel RequiredLevel => TransformLevel.Similarity;
+    public static Type[] ConclusionTypes => [typeof(SegmentRatioFact)];
+    public static Type[] PremiseTypes => [typeof(SegmentRatioFact)];
+
+    public static int Apply(FactBase facts)
+    {
+        int count = 0;
+        foreach (var first in facts.SegmentRatios.ToList())
+        {
+            foreach (var second in facts.SegmentRatiosWith(first.B1, first.B2).ToList())
+            {
+                if (ReferenceEquals(second, first)) continue;
+
+                if (second.A1 == first.B1 && second.A2 == first.B2)
+                {
+                    count += TryAdd(facts, first, second, first.Value * second.Value,
+                        first.A1, first.A2, second.B1, second.B2);
+                }
+                else if (second.B1 == first.B1 && second.B2 == first.B2)
+                {
+                    if (second.Value.VerifyStrictZero() == StrictResult.StrictlyTrue) continue;
+                    count += TryAdd(facts, first, second, first.Value / second.Value,
+                        first.A1, first.A2, second.A1, second.A2);
+                }
+            }
+        }
+        return count;
+    }
+
+    private static int TryAdd(
+        FactBase facts, SegmentRatioFact first, SegmentRatioFact second, ExactScalar value,
+        string a1, string a2, string b1, string b2)
+    {
+        if (!facts.Points.TryGetValue(a1, out var pa1) ||
+            !facts.Points.TryGetValue(a2, out var pa2) ||
+            !facts.Points.TryGetValue(b1, out var pb1) ||
+            !facts.Points.TryGetValue(b2, out var pb2)) return 0;
+
+        if (GeometryAudit.IsSegmentRatio(pa1, pa2, pb1, pb2, value) != StrictResult.StrictlyTrue)
+            return 0;
+
+        var candidate = SegmentRatioFact.Create(a1, a2, b1, b2, value);
+        return facts.AddDerivedFact(candidate, RuleIds.SegmentRatioTransitivity, first, second) ? 1 : 0;
+    }
+}
