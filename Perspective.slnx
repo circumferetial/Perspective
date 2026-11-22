@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Perspective.Core/Perspective.Core.csproj" />
+  <Project Path="Perspective.Sandbox/Perspective.Sandbox.csproj" />
+</Solution>
