@@ -1,13 +1,19 @@
-# 构建产物
-bin/
-obj/
-
-# IDE
-.idea/
-.vs/
+# Build
+[Bb]in/
+[Oo]bj/
 *.user
 *.suo
+.vs/
+TestResults/
+*.trx
+_ReSharper*/
+.idea/
 
-# 临时/本地文件
-*.tmp
-*.log
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# OS
+Thumbs.db
+.DS_Store
