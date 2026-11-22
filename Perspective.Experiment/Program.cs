@@ -70,5 +70,6 @@ public static class Program
                           $"{Vec3.Point(1, 0).Incident(pencil)}");
         ConstraintLadder.Run();
         StructureLadder.Run();
+        GrassmannExperiment.Run();
     }
 }
