@@ -47,6 +47,10 @@
 - 唯一写入入口 `FactBase.AddFact`，同时维护按类型视图与按 id 索引；
 - 规则用声明式查询表达前提（`LinesThrough`、`PointsOn`、`HasOnConic` 等），
   不手写全表扫描；
+- **规则自动生成的辅助点必须加 `AUX:` 前缀**（如 Pascal 的交点、四点形的对角点）。
+  这类点只用于让事实可引用，**不得参与"顶点/直线枚举"**——否则下一轮规则会把它
+  当成新的结构性对象，导致组合爆炸与错误构造。同理，辅助点的 id 必须包含生成它的
+  完整上下文（例如四点形的四个顶点），禁止只按一条边命名，否则不同构形会撞 id；
 - **幂集事实**（`CollinearFact` 三点共线、`ConcurrentFact` 三线共点）无法按单个 id
   索引：去重靠**排序后的三元组规范键**（`Create` + `AddFact` 内规范化），检索靠
   **按对索引第三元**（`ThirdPointsCollinearWith`、`ThirdLinesConcurrentWith`）。

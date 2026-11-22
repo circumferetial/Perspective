@@ -502,9 +502,9 @@ public readonly struct PascalRule : IFactRule<PascalRule>
                 if (PointTools.Collinear(p, q, r) != StrictResult.StrictlyTrue) continue;
 
                 // 交点作为辅助点登记（幂等 id），供 CollinearFact 引用
-                string pId = EnsurePoint(facts, $"PASCAL[{a1}{a2}|{a4}{a5}]", p);
-                string qId = EnsurePoint(facts, $"PASCAL[{a2}{a3}|{a5}{a6}]", q);
-                string rId = EnsurePoint(facts, $"PASCAL[{a3}{a4}|{a6}{a1}]", r);
+                string pId = EnsurePoint(facts, $"AUX:PASCAL[{a1}{a2}|{a4}{a5}]", p);
+                string qId = EnsurePoint(facts, $"AUX:PASCAL[{a2}{a3}|{a5}{a6}]", q);
+                string rId = EnsurePoint(facts, $"AUX:PASCAL[{a3}{a4}|{a6}{a1}]", r);
 
                 if (facts.AddFact(CollinearFact.Create(pId, qId, rId),
                     $"[{Title}] 内接六边形 {a1}{a2}{a3}{a4}{a5}{a6} 于 {conicId}：对边交点 {pId},{qId},{rId} 共线"))
@@ -519,6 +519,164 @@ public readonly struct PascalRule : IFactRule<PascalRule>
         p.X.IsNumericallyZero() && p.Y.IsNumericallyZero() && p.W.IsNumericallyZero();
 
     /// <summary>确保辅助点已登记（同 id 已存在则不覆盖）。</summary>
+    private static string EnsurePoint(FactBase facts, string id, HPoint p)
+    {
+        if (!facts.Points.ContainsKey(id)) facts.AddPoint(id, p);
+        return id;
+    }
+}
+
+/// <summary>
+/// 命题 10：完全四点形（4 点、6 边、3 对角点）的调和性。
+/// 【前提】① 4 个已登记点 A、B、C、D 处于一般位置（任三点不共线，严通道回验）；
+///         ② 三个对角点 P = AB∩CD、Q = AC∩BD、R = AD∩BC 均为非零向量且互不重合。
+/// 【结论】每条边上：两个顶点、该边上的对角点、另一条对角线与该边的交点，构成调和点列。
+///         例如边 AB：P = AB∩CD 是 AB 上的对角点，S = QR∩AB 是另一条对角线 QR 与 AB 的交点，
+///         则 (A, B; P, S) = −1。六条边各得一条 HarmonicFact。
+/// 【推导】完全四点形的经典调和性质（射影几何标准定理）。以 AB 边为例：
+///         把 QR 与 AB 的交点记为 S，则交比 (A,B;P,S) 在射影变换下不变；
+///         取标准四点形（如 A=(0,0),B=(1,0),C=(2,1),D=(0,2)）可直接算出
+///         P=(4,0), S=(4/7,0)，(A,B;P,S) = −1，故恒等于 −1。
+///         本规则对每条边都做 IsHarmonic 严通道回验，不通过不写库。
+/// 【等级】Projective——调和比是射影不变量，本定理不依赖圆锥曲线。
+/// 【实现说明】三个对角点与各边交点作为辅助点登记（幂等 id）；每条四点形最多取 8 个点组合。
+/// </summary>
+public readonly struct CompleteQuadrangleHarmonicRule : IFactRule<CompleteQuadrangleHarmonicRule>
+{
+    public static string Title => "完全四点形的调和性";
+    public static TransformLevel RequiredLevel => TransformLevel.Projective;
+
+    private const int MaxPool = 8;
+
+    public static int Apply(FactBase facts)
+    {
+        int count = 0;
+
+        var pool = new List<string>();
+        foreach (var pid in facts.Points.Keys)
+        {
+            if (pool.Count >= MaxPool) break;
+            // 规则自动生成的辅助点（AUX: 前缀）不作为结构性顶点参与枚举，
+            // 否则下一轮会把它们当成新顶点，导致组合爆炸与错误的四边形。
+            if (pid.StartsWith("AUX:", StringComparison.Ordinal)) continue;
+            pool.Add(pid);
+        }
+        if (pool.Count < 4) return 0;
+
+        for (int i = 0; i < pool.Count - 3; i++)
+        for (int j = i + 1; j < pool.Count - 2; j++)
+        for (int k = j + 1; k < pool.Count - 1; k++)
+        for (int l = k + 1; l < pool.Count; l++)
+        {
+            string aId = pool[i], bId = pool[j], cId = pool[k], dId = pool[l];
+            var A = facts.Points[aId]; var B = facts.Points[bId];
+            var C = facts.Points[cId]; var D = facts.Points[dId];
+
+            // 廉价过滤：已知共线事实 / 数值行列式（只用于筛除明显退化的组合，结论仍由严通道决定）
+            if (KnownCollinear(facts, aId, bId, cId) || KnownCollinear(facts, aId, bId, dId)
+             || KnownCollinear(facts, aId, cId, dId) || KnownCollinear(facts, bId, cId, dId)) continue;
+            if (CollinearApprox(A, B, C) || CollinearApprox(A, B, D)
+             || CollinearApprox(A, C, D) || CollinearApprox(B, C, D)) continue;
+
+            // 一般位置：任三点不共线（严通道复核）
+            if (PointTools.Collinear(A, B, C) == StrictResult.StrictlyTrue) continue;
+            if (PointTools.Collinear(A, B, D) == StrictResult.StrictlyTrue) continue;
+            if (PointTools.Collinear(A, C, D) == StrictResult.StrictlyTrue) continue;
+            if (PointTools.Collinear(B, C, D) == StrictResult.StrictlyTrue) continue;
+
+            // 三个对角点
+            var P = HLine.Intersect(HLine.FromPoints(A, B), HLine.FromPoints(C, D));
+            var Q = HLine.Intersect(HLine.FromPoints(A, C), HLine.FromPoints(B, D));
+            var R = HLine.Intersect(HLine.FromPoints(A, D), HLine.FromPoints(B, C));
+
+            if (IsZeroVector(P) || IsZeroVector(Q) || IsZeroVector(R)) continue;
+            if (PointTools.Same(P, Q) || PointTools.Same(Q, R) || PointTools.Same(P, R)) continue;
+
+            string pId = EnsurePoint(facts, $"AUX:CQ[{aId}{bId}|{cId}{dId}]", P);
+            string qId = EnsurePoint(facts, $"AUX:CQ[{aId}{cId}|{bId}{dId}]", Q);
+            string rId = EnsurePoint(facts, $"AUX:CQ[{aId}{dId}|{bId}{cId}]", R);
+
+            // 六条边：每条边上取"该边上的对角点" + "另一条对角线与该边的交点"
+            var sides = new (string XId, string YId, HPoint X, HPoint Y, HPoint G, string GId, HLine OtherDiag, HLine Edge)[]
+            {
+                (aId, bId, A, B, P, pId, HLine.FromPoints(Q, R), HLine.FromPoints(A, B)),
+                (cId, dId, C, D, P, pId, HLine.FromPoints(Q, R), HLine.FromPoints(C, D)),
+                (aId, cId, A, C, Q, qId, HLine.FromPoints(P, R), HLine.FromPoints(A, C)),
+                (bId, dId, B, D, Q, qId, HLine.FromPoints(P, R), HLine.FromPoints(B, D)),
+                (aId, dId, A, D, R, rId, HLine.FromPoints(P, Q), HLine.FromPoints(A, D)),
+                (bId, cId, B, C, R, rId, HLine.FromPoints(P, Q), HLine.FromPoints(B, C)),
+            };
+
+            foreach (var s in sides)
+            {
+                var S = HLine.Intersect(s.Edge, s.OtherDiag);
+                if (IsZeroVector(S)) continue;
+                if (PointTools.Same(S, s.X) || PointTools.Same(S, s.Y) || PointTools.Same(S, s.G)) continue;
+
+                // 数值预筛：交比明显不是 −1 的组合直接跳过（结论仍由严通道决定）
+                if (!HarmonicApprox(s.X, s.Y, s.G, S)) continue;
+
+                if (GeometryAudit.IsHarmonic(s.X, s.Y, s.G, S) != StrictResult.StrictlyTrue) continue;
+
+                string sId = EnsurePoint(facts, $"AUX:CQ[{aId}{bId}{cId}{dId}][{s.XId}{s.YId}]", S);
+                if (facts.AddFact(new HarmonicFact(s.XId, s.YId, s.GId, sId),
+                    $"[{Title}] 四点形 {aId}{bId}{cId}{dId}：边 {s.XId}{s.YId} 上 ({s.XId},{s.YId};{s.GId},{sId}) = -1"))
+                    count++;
+            }
+        }
+
+        return count;
+    }
+
+    private static bool IsZeroVector(HPoint p) =>
+        p.X.IsNumericallyZero() && p.Y.IsNumericallyZero() && p.W.IsNumericallyZero();
+
+    /// <summary>已知共线事实的 O(1) 查询（廉价过滤用）。</summary>
+    private static bool KnownCollinear(FactBase facts, string a, string b, string c) =>
+        facts.Facts.Contains(CollinearFact.Create(a, b, c));
+
+    /// <summary>数值共线预筛：只判"明显共线"，用作廉价过滤，结论仍由严通道决定。</summary>
+    private static bool CollinearApprox(HPoint p, HPoint q, HPoint r)
+    {
+        double det = p.X.Approx * (q.Y.Approx * r.W.Approx - q.W.Approx * r.Y.Approx)
+                   - p.Y.Approx * (q.X.Approx * r.W.Approx - q.W.Approx * r.X.Approx)
+                   + p.W.Approx * (q.X.Approx * r.Y.Approx - q.Y.Approx * r.X.Approx);
+        double scale = System.Math.Max(1.0,
+            System.Math.Max(System.Math.Abs(p.X.Approx) + System.Math.Abs(p.Y.Approx) + System.Math.Abs(p.W.Approx),
+            System.Math.Max(System.Math.Abs(q.X.Approx) + System.Math.Abs(q.Y.Approx) + System.Math.Abs(q.W.Approx),
+                            System.Math.Abs(r.X.Approx) + System.Math.Abs(r.Y.Approx) + System.Math.Abs(r.W.Approx))));
+        return System.Math.Abs(det) <= 1e-9 * scale * scale * scale;
+    }
+
+    /// <summary>
+    /// 数值交比预筛：沿 AB 参数化算交比 (A,B;C,D)，明显不等于 −1 时跳过该边。
+    /// 只作过滤；真正的结论由 GeometryAudit.IsHarmonic 严通道给出。
+    /// </summary>
+    private static bool HarmonicApprox(HPoint a, HPoint b, HPoint c, HPoint d)
+    {
+        if (a.IsAtInfinity || b.IsAtInfinity || c.IsAtInfinity || d.IsAtInfinity) return true;
+
+        var pa = a.ToCartesianApprox(); var pb = b.ToCartesianApprox();
+        var pc = c.ToCartesianApprox(); var pd = d.ToCartesianApprox();
+        if (pa is null || pb is null || pc is null || pd is null) return true;
+
+        double ax = pa.Value.X, ay = pa.Value.Y;
+        double bx = pb.Value.X, by = pb.Value.Y;
+        double vx = bx - ax, vy = by - ay;
+        double len2 = vx * vx + vy * vy;
+        if (len2 < 1e-15) return true;
+
+        double Param(double px, double py) => ((px - ax) * vx + (py - ay) * vy) / len2;
+        double tc = Param(pc.Value.X, pc.Value.Y);
+        double td = Param(pd.Value.X, pd.Value.Y);
+
+        double denom = (tc - 1.0) * (td - 0.0);   // (tC − tB)(tD − tA)，tA=0, tB=1
+        if (System.Math.Abs(denom) < 1e-12) return true;   // 退化交比交给严通道
+
+        double cr = (tc - 0.0) * (td - 1.0) / denom;
+        return System.Math.Abs(cr + 1.0) <= 1e-6;
+    }
+
     private static string EnsurePoint(FactBase facts, string id, HPoint p)
     {
         if (!facts.Points.ContainsKey(id)) facts.AddPoint(id, p);
