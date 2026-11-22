@@ -86,8 +86,20 @@
 | 层级 | 用什么 | 状态 |
 |---|---|---|
 | Tier 1 | AngouriMath：一元不等式求解、集合代数、符号化简 | ✅ 已用（`RealSets`） |
-| Tier 2 | SymPy 外部 CAS：`solveset` / `reduce_inequalities`（多约束、部分多变量） | ⏳ 本机有 Python 3.14 但未装 SymPy，需用户批准后接入，结果标记"外部 CAS" |
-| Tier 3 | 实代数 QE（QEPCAD / RAGLib / Z3-nlsat） | ❌ 不接；真需要时外部进程调用 |
+| Tier 2 | **Z3（`Microsoft.Z3` NuGet，底层即 C API）**：非线性实算术判定（nlsat） | ✅ 已验证可用（见下），待接入为"代数判定神谕" |
+| Tier 2b | SymPy（外部进程）：多变量不等式化简 | ⏳ 本机有 Python 3.14、未装 SymPy；Z3 覆盖后可暂不接 |
+| Tier 3 | 实代数 QE（QEPCAD / RAGLib） | ❌ 不接；真需要时外部进程 |
+
+**Z3 实测**（探针验证）：
+- `x²−2x−1=0 ∧ x>1`（即 x=1+√2）下判 `x>2` → SATISFIABLE；
+- `k²−4<0 ∧ k<0` 下判 `k=−1` → SAT、`k=1` → UNSAT；
+- `0<1+√2` → SAT、`3<1+√2` → UNSAT。
+结论：Z3 能精确判定代数数比较与不等式组可满足性，**弥补 AngouriMath 对嵌套根式
+`ElementInSet` 化简不可靠的短板**。但 Z3 只给判定、不产出人类可读区间，因此定位是
+**判定神谕**（当 `RealSets.Contains` 返回 `NoSymbolicData` 时兜底），不替代 `RealSets` 的表示。
+
+接入方式（待实施）：独立可选项目 `Perspective.Oracle.Z3`（Core 不引入原生依赖）+
+`IAlgebraicOracle` 接口；仅在需要时引用。
 
 原则：**能库则库**；只有"现成库确实不支持且必须做"才标"不支持"，并且要在本文件登记原因。
 

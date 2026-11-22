@@ -6,7 +6,20 @@ using Perspective.Core.Math;
 namespace Perspective.Core.Discovery;
 
 public record CircleCenterResult(HPoint Center, ExactScalar RadiusSquared, ProofStatus Status);
-public record FixedSlopePointResult(HPoint Point, ExactScalar ConstantValue, string? ExcludedParamsNote);
+
+/// <summary>
+/// 定点 E 的求解结果。
+/// <para>
+/// <see cref="ExcludedParams"/> 是**显式的非退化条件（NDG）**：使斜率无定义、从而结论不成立的
+/// 参数值集合（对照 I2GATP 的 ndg 字段）。<see cref="ExcludedParamsNote"/> 只是人类可读的
+/// 渲染，不再承担语义；机器推理请用集合本身（可做并/交/差，见 <see cref="RealSets"/>）。
+/// </para>
+/// </summary>
+public record FixedSlopePointResult(HPoint Point, ExactScalar ConstantValue, string? ExcludedParamsNote)
+{
+    /// <summary>非退化条件：被排除的参数值集合（空集表示无排除）。</summary>
+    public Entity.Set ExcludedParams { get; init; } = Entity.Set.Empty;
+}
 
 public static class InverseExamSolver
 {
@@ -198,24 +211,29 @@ public static class InverseExamSolver
                 // 排除口径（严谨）：dCand(k)=0 等价于点差二次方程的 y^2 系数为 0，
                 // 即 AE 或 BE 中必有竖直方向，斜率（从而斜率和）在该 k 无定义。
                 // 这与判别式无关，因此记录分母的全部实零点，不再按数值阈值过滤。
-                var excluded = new List<string>();
+                // 结果以集合形式保存（NDG 字段），人类可读文本只是渲染。
+                var excludedRoots = new List<Entity>();
                 if (dCand.SolveEquation(paramName) is Entity.Set.FiniteSet dZeros)
                 {
                     foreach (var z in dZeros)
                         if (z.EvalNumerical() is Entity.Number.Complex cz && cz.ImaginaryPart.IsZero)
-                            excluded.Add($"{paramName} = {z.Simplify()}");
+                            excludedRoots.Add(z.Simplify());
                 }
+
+                var excludedSet = excludedRoots.Count == 0
+                    ? Entity.Set.Empty
+                    : MathS.Sets.Finite(excludedRoots.ToArray());
 
                 var pt = new HPoint(
                     new ExactScalar((double)rx.EvalNumerical(), rx),
                     new ExactScalar((double)ry.EvalNumerical(), ry),
                     1);
                 var val = new ExactScalar((double)lambda.EvalNumerical(), lambda);
-                string? note = excluded.Count > 0
-                    ? $"注意：当 {string.Join(", ", excluded)} 时直线过点 E，斜率无意义"
+                string? note = excludedRoots.Count > 0
+                    ? $"非退化条件（NDG）：{paramName} ∉ {RealSets.Describe(excludedSet)}（这些值使斜率无定义）"
                     : null;
 
-                results.Add(new FixedSlopePointResult(pt, val, note));
+                results.Add(new FixedSlopePointResult(pt, val, note) { ExcludedParams = excludedSet });
             }
         }
 
