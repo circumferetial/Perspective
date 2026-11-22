@@ -168,6 +168,16 @@ SymPy（子进程 + JSON，`ISymbolicBackend`，零 native 构建）。
 **候选**：SymPy（更强的化简/消元/因式分解）、QE 后端（CAD/VS 型）、
 数值全局优化器（仅作候选生成，最终仍要严格反例检查）。
 
+## 4j. 题板与题型模板（多问依赖）
+
+- **陈设（ProblemScene）** = 共享 `FactBase` + 参数表 + 已答各问；它是"一道题的公共上下文"。
+- **模板（IProblemTemplate）** = 输入陈设 + 槽位，输出 `ProblemAnswer`（值/解集/可达性/严格性/步骤链）；
+  模板只做装配与格式化，数学仍由已有组件完成。
+- **多问依赖**：`ProblemBoard.UseAnswerAsParameter` 把上一问数值结论注入参数表；
+  已证事实留在共享事实库。这样"第 (2) 问用第 (1) 问结论"不需要特殊机制。
+- **两类输入**：求解型 = 陈设 + 槽位（曲线 id、参数名、表达式）；
+  证明型 = 陈设 + 结构化 `GeoClaim`。模板都不解析自然语言题干。
+
 ## 5. 事实模型
 
 > 完整的事实/定理清单见 [facts-theorems.md](facts-theorems.md)（单一出处）。
