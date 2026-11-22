@@ -132,8 +132,98 @@ public static class ExtremumSolver
             + (notes.Count > 0 ? "；" + string.Join("；", notes) : ""));
     }
 
-    private static bool SatisfiesDomain(
-        IReadOnlyList<RelationStatement> domain, string variableName, ExactScalar candidate)
+    /// <summary>
+    /// 有理目标函数 f = N/D 的极值（要求 D 在定义域上恒正）。
+    /// <para>
+    /// 关键：全程保持多项式——f'=0 ⇔ N'D − ND' = 0（不再出现变量分母）；
+    /// 闭合检查用 N − v·D 的符号（D&gt;0 时与 f − v 同号），Z3 只吃多项式。
+    /// </para>
+    /// </summary>
+    public static ExtremumReport? FindExtremumOfRational(
+        string variableName,
+        ExactScalar numerator,
+        ExactScalar denominator,
+        ExtremumKind kind,
+        IAlgebraicOracle? oracle = null,
+        bool denominatorPositive = true)
+    {
+        if (numerator.Exact is null || denominator.Exact is null) return null;
+        if (!denominatorPositive) return null;   // 当前只支持分母恒正的闭合
+
+        Entity.Variable variable = variableName;
+        var candidates = new List<ExactScalar>();
+
+        // 驻点：N'D − ND' = 0
+        try
+        {
+            var n = numerator.Exact;
+            var d = denominator.Exact;
+            var equation = (n.Differentiate(variable) * d - n * d.Differentiate(variable)).Simplify();
+            if (MathS.Equality(equation, 0).Solve(variable) is Entity.Set.FiniteSet roots)
+            {
+                foreach (var root in roots)
+                {
+                    if (root.EvalNumerical() is Entity.Number.Complex complex && !complex.ImaginaryPart.IsZero)
+                        continue;
+                    candidates.Add(ToScalar(root.Simplify()));
+                }
+            }
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+
+        if (candidates.Count == 0) return null;
+
+        var feasible = new List<(ExactScalar Candidate, ExactScalar Value)>();
+        foreach (var candidate in candidates)
+        {
+            var numeratorValue = Evaluate(numerator, variableName, candidate);
+            var denominatorValue = Evaluate(denominator, variableName, candidate);
+            if (numeratorValue is null || denominatorValue is null) continue;
+            if (denominatorValue.Value.VerifyStrictZero() == StrictResult.StrictlyTrue) continue;
+            feasible.Add((candidate, numeratorValue.Value / denominatorValue.Value));
+        }
+        if (feasible.Count == 0) return null;
+
+        var best = kind == ExtremumKind.Maximum
+            ? feasible.OrderByDescending(x => x.Value.Approx).First()
+            : feasible.OrderBy(x => x.Value.Approx).First();
+
+        bool attained = feasible.Any(x => (x.Value - best.Value).VerifyStrictZero() == StrictResult.StrictlyTrue);
+
+        OracleVerdict? closure = null;
+        string closureText = "未启用外部判定器（仅候选启发式，未闭合）";
+        if (oracle is not null)
+        {
+            // D > 0 ⇒ sign(N − v·D) = sign(f − v)
+            var difference = numerator - best.Value * denominator;
+            var relation = kind == ExtremumKind.Maximum
+                ? new RelationStatement(RelationKind.GreaterThan, difference, ExactScalar.FromInt(0))
+                : new RelationStatement(RelationKind.LessThan, difference, ExactScalar.FromInt(0));
+
+            closure = oracle.DecideExists([variableName], [relation]);
+            closureText = closure.Kind switch
+            {
+                OracleVerdictKind.Unsat => kind == ExtremumKind.Maximum
+                    ? "外部判定器确认不存在更大的点，故该值为全局上界"
+                    : "外部判定器确认不存在更小的点，故该值为全局下界",
+                OracleVerdictKind.Sat => "外部判定器找到更优反例：" + closure.Model,
+                _ => "外部判定器无法判定：" + (closure.Reason ?? "unknown")
+            };
+        }
+
+        return new ExtremumReport(
+            kind,
+            best.Value,
+            attained,
+            feasible.Select(x => x.Candidate).ToList(),
+            closure,
+            $"{kind}候选「{best.Value}」{(attained ? "可取到" : "不可取到")}；{closureText}");
+    }
+
+    private static bool SatisfiesDomain(        IReadOnlyList<RelationStatement> domain, string variableName, ExactScalar candidate)
     {
         foreach (var relation in domain)
         {

@@ -12,7 +12,7 @@
 | 2022 新高考Ⅰ 21 | (1) 求 l 的斜率 | ✅ | 双线组斜率和 = (2m+2)/(c+2m+1)，分子为零 ⇒ m = −1（`SolveChordSlopeForZeroSlopeSum`） |
 |  | (2) tan∠PAQ=2√2 求面积 | ✅ | tan² 平方去根号 → 三次方程根 {3, 5/3}；回验滤掉 cc=3（弦过 A 退化）⇒ 面积 = 16√2/9（`SolveAreaFromTangent`） |
 | 2022 浙江 21 | (ⅰ) 最大距离 | ✅ | 参数化 s=sin t∈[−1,1]，距离²=13−11s²−2s，`ExtremumSolver` 得 max=144/11（s=−1/11），Z3 闭合无反例 ⇒ 距离 max=12/√11 |
-|  | (ⅱ) |CD| 最小值 | ❌ | 需要多约束/几何降维，尚未做 |
+|  | (ⅱ) |CD| 最小值 | ✅ | 线对二次型 PA∪PB 与定直线求交（无根号）：\|CD\|²=180 时 m=3/16，`FindExtremumOfRational` + Z3 闭合 ⇒ \|CD\|min=6√5 |
 | 2022 全国乙理 20 | (1) 椭圆方程 | ✅ | 由 A、B 在 E 上直接得 x²/3+y²/4=1 |
 |  | (2) HN 过定点 | ✅ | **`DiscoveryEngine.DiscoverFixedPoint` 得 SymbolicProved，定点 (0,−2)**；归一化后约 0.55s（原 99.5s） |
 | 2020 上海 20 | (1) 求 b | ✅ | 代数消元 |

@@ -351,6 +351,41 @@ public readonly record struct Conic(Matrix3x3 Matrix)
         var adjL = Matrix.Adjugate() * line;
         return line.A * adjL.A + line.B * adjL.B + line.C * adjL.C;
     }
+
+    /// <summary>
+    /// 把本二次型限制到直线上：Q(p₀ + t·d) = a t² + b t + c。
+    /// <para>
+    /// 【用途】求"直线与二次型交点"的对称量（交点差、弦长）时**避免显式开方**；
+    /// 也适用于"线对"退化二次型（如 PA∪PB），此时两交点即两条线的落点。
+    /// </para>
+    /// </summary>
+    public (ExactScalar A, ExactScalar B, ExactScalar C) RestrictToLine(HLine line)
+    {
+        // p₀：直线上离原点最近的点；d：方向向量
+        var p0 = new HPoint(-line.A * line.C, -line.B * line.C, line.A * line.A + line.B * line.B);
+        var direction = new HPoint(-line.B, line.A, 0);
+
+        var qd = Matrix * direction;
+        var qp = Matrix * p0;
+
+        static ExactScalar Dot(HPoint u, HPoint v) => u.X * v.X + u.Y * v.Y + u.W * v.W;
+
+        return (Dot(direction, qd), 2 * Dot(direction, qp), Dot(p0, qp));
+    }
+
+    /// <summary>直线方向向量的长度平方（用于把参数差换算成实际长度）。</summary>
+    public static ExactScalar DirectionLengthSquared(HLine line) => line.A * line.A + line.B * line.B;
+
+    /// <summary>
+    /// 直线与二次型两交点之间的距离平方：|d|²·(b²−4ac)/a²（无根号，韦达定理）。
+    /// 要求a ≠ 0（直线不退化）；相交但不要求实交点。
+    /// </summary>
+    public ExactScalar IntersectionChordLengthSquared(HLine line)
+    {
+        var (a, b, c) = RestrictToLine(line);
+        var direction2 = DirectionLengthSquared(line);
+        return direction2 * (b * b - 4 * a * c) / (a * a);
+    }
 }
 
 /// <summary>

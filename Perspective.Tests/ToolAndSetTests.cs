@@ -69,6 +69,23 @@ public class ToolAndSetTests
         Assert.Equal(StrictResult.StrictlyTrue, circle.ContainsStrictly(other));
     }
 
+    /// <summary>二次型限制到直线的无根号弦长公式：圆 x²+y²=4 与 y=1 的弦长² = 12。</summary>
+    [Fact]
+    public void ConicRestrictToLine_ChordLengthSquared()
+    {
+        var circle = Scenes.Circle4;
+        var line = new HLine(0, 1, -1);          // y = 1
+        var (a, b, c) = circle.RestrictToLine(line);
+
+        Assert.False(a.VerifyStrictZero() == StrictResult.StrictlyTrue);
+        Assert.Equal(12.0, circle.IntersectionChordLengthSquared(line).Approx, 12);
+
+        // 与显式交点结果一致
+        var pts = circle.Intersect(line);
+        Assert.Equal(2, pts.Length);
+        Assert.Equal(12.0, Metric.DistanceSquared(pts[0], pts[1]).Approx, 12);
+    }
+
     [Fact]
     public void RealSets_UnionIntersectSubtract()
     {
