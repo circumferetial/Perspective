@@ -159,6 +159,9 @@ public sealed class FactBase
     /// <summary>已有交点 id（供规则枚举"过每个点的线"）。</summary>
     public IEnumerable<string> PointIdsWithLines => _linesThroughPoint.Keys;
 
+    /// <summary>已有曲线 id（供规则枚举"每条曲线上的点"）。</summary>
+    public IEnumerable<string> ConicIdsWithPoints => _pointsOnConic.Keys;
+
     /// <summary>注册一条新事实（若已存在则忽略；返回 true 表示推出了新知识）。</summary>
     public bool AddFact(GeoFact fact, string trace)
     {

@@ -431,6 +431,102 @@ public readonly struct ConjugateDiameterBisectsChordRule : IFactRule<ConjugateDi
 }
 
 /// <summary>
+/// 命题 9：Pascal 定理（内接六边形三对边交点共线）。
+/// 【前提】① 同一非退化圆锥曲线上有 6 个互异点 A₁…A₆（OnConic 事实，且逐点
+///         ContainsStrictly 严通道回验）；② 六边形按 A₁…A₆ 的遍历顺序取对边：
+///         (A₁A₂, A₄A₅)、(A₂A₃, A₅A₆)、(A₃A₄, A₆A₁)。
+/// 【结论】三个对边交点 P、Q、R 共线（Pascal 线）→ CollinearFact(P, Q, R)。
+/// 【推导】射影几何标准定理：内接于非退化二次曲线的六边形，其三组对边交点共线。
+///         对自交六边形同样成立（射影意义下）。退化情形（某两对边平行 ⇒ 交点在
+///         无穷远）依然成立，因为齐次坐标下"共线"包含无穷远点。
+///         本规则对结论做严通道回验（PointTools.Collinear），不通过就不写库。
+/// 【等级】Projective——Pascal 是射影不变量。
+/// 【实现说明】六边形交点会作为辅助点登记进事实库（幂等 id），供 CollinearFact 引用；
+///         每条曲线最多取 8 个已登记点做组合（C(8,6)=28），避免组合爆炸。
+/// </summary>
+public readonly struct PascalRule : IFactRule<PascalRule>
+{
+    public static string Title => "Pascal 内接六边形定理";
+    public static TransformLevel RequiredLevel => TransformLevel.Projective;
+
+    /// <summary>单条曲线上参与组合的点数上限（控制组合数与符号验证成本）。</summary>
+    private const int MaxPool = 8;
+
+    public static int Apply(FactBase facts)
+    {
+        int count = 0;
+
+        foreach (var conicId in facts.ConicIdsWithPoints)
+        {
+            if (!facts.Conics.TryGetValue(conicId, out var conic)) continue;
+
+            // 非退化要求：退化曲线不适用 Pascal 的常规形式
+            if (conic.Matrix.Determinant().VerifyStrictZero() == StrictResult.StrictlyTrue) continue;
+
+            // 严通道回验：只保留真正落在曲线上的点
+            var pool = new List<string>();
+            foreach (var pid in facts.PointsOnConic(conicId))
+            {
+                if (pool.Count >= MaxPool) break;
+                if (!facts.Points.TryGetValue(pid, out var pt)) continue;
+                if (conic.ContainsStrictly(pt) == StrictResult.StrictlyTrue) pool.Add(pid);
+            }
+            if (pool.Count < 6) continue;
+
+            for (int i = 0; i < pool.Count - 5; i++)
+            for (int j = i + 1; j < pool.Count - 4; j++)
+            for (int k = j + 1; k < pool.Count - 3; k++)
+            for (int l = k + 1; l < pool.Count - 2; l++)
+            for (int m = l + 1; m < pool.Count - 1; m++)
+            for (int n = m + 1; n < pool.Count; n++)
+            {
+                string a1 = pool[i], a2 = pool[j], a3 = pool[k];
+                string a4 = pool[l], a5 = pool[m], a6 = pool[n];
+
+                // 三组对边交点：P = A₁A₂ ∩ A₄A₅，Q = A₂A₃ ∩ A₅A₆，R = A₃A₄ ∩ A₆A₁
+                var p = HLine.Intersect(
+                    HLine.FromPoints(facts.Points[a1], facts.Points[a2]),
+                    HLine.FromPoints(facts.Points[a4], facts.Points[a5]));
+                var q = HLine.Intersect(
+                    HLine.FromPoints(facts.Points[a2], facts.Points[a3]),
+                    HLine.FromPoints(facts.Points[a5], facts.Points[a6]));
+                var r = HLine.Intersect(
+                    HLine.FromPoints(facts.Points[a3], facts.Points[a4]),
+                    HLine.FromPoints(facts.Points[a6], facts.Points[a1]));
+
+                // 退化守卫：交点不能是零向量；三点不得有重合
+                if (IsZeroVector(p) || IsZeroVector(q) || IsZeroVector(r)) continue;
+                if (PointTools.Same(p, q) || PointTools.Same(q, r) || PointTools.Same(p, r)) continue;
+
+                // 结论严通道回验：三点确实共线
+                if (PointTools.Collinear(p, q, r) != StrictResult.StrictlyTrue) continue;
+
+                // 交点作为辅助点登记（幂等 id），供 CollinearFact 引用
+                string pId = EnsurePoint(facts, $"PASCAL[{a1}{a2}|{a4}{a5}]", p);
+                string qId = EnsurePoint(facts, $"PASCAL[{a2}{a3}|{a5}{a6}]", q);
+                string rId = EnsurePoint(facts, $"PASCAL[{a3}{a4}|{a6}{a1}]", r);
+
+                if (facts.AddFact(CollinearFact.Create(pId, qId, rId),
+                    $"[{Title}] 内接六边形 {a1}{a2}{a3}{a4}{a5}{a6} 于 {conicId}：对边交点 {pId},{qId},{rId} 共线"))
+                    count++;
+            }
+        }
+
+        return count;
+    }
+
+    private static bool IsZeroVector(HPoint p) =>
+        p.X.IsNumericallyZero() && p.Y.IsNumericallyZero() && p.W.IsNumericallyZero();
+
+    /// <summary>确保辅助点已登记（同 id 已存在则不覆盖）。</summary>
+    private static string EnsurePoint(FactBase facts, string id, HPoint p)
+    {
+        if (!facts.Points.ContainsKey(id)) facts.AddPoint(id, p);
+        return id;
+    }
+}
+
+/// <summary>
 /// 命题 7：同一条直线上的三点共线。
 /// 【前提】① 存在直线 L，使 P1、P2、P3 都登记为 L 上的点（事实查询）；
 ///         ② 严通道回验三点坐标确实共线（PointTools.Collinear），不信任标签。
