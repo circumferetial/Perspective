@@ -47,4 +47,8 @@ public static class RuleIds
 
     /// <summary>外部构造（人/LLM/构造搜索提出、机器验收）产生的事实。</summary>
     public const string ExternalConstruction = "external-construction";
+
+    public const string ParallelTransitivity = "parallel-transitivity";
+
+    public const string PerpendicularParallel = "perpendicular-parallel";
 }

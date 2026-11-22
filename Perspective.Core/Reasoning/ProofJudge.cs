@@ -133,8 +133,8 @@ public static class ProofJudge
         ClaimPolarOf => typeof(PolarOfFact),
         ClaimHarmonic => typeof(HarmonicFact),
         ClaimCollinear => typeof(CollinearFact),
-        ClaimPerpendicular => null,   // 尚无 PerpendicularFact
-        ClaimParallel => null,        // 尚无 ParallelFact
+        ClaimPerpendicular => typeof(PerpendicularFact),
+        ClaimParallel => typeof(ParallelFact),
         _ => null
     };
 
@@ -150,12 +150,15 @@ public static class ProofJudge
             ClaimHarmonic c => facts.Harmonics.FirstOrDefault(hf =>
                 ((hf.AId == c.AId && hf.BId == c.BId) || (hf.AId == c.BId && hf.BId == c.AId)) &&
                 ((hf.CId == c.CId && hf.DId == c.DId) || (hf.CId == c.DId && hf.DId == c.CId))),
-            // 共线已有对应事实类型（CollinearFact），在此映射；
-            // 垂直/平行仍无事实类型，只能落到代数预言机——一旦加入必须在此补映射，
-            // 否则会出现"规则推得出、裁决器看不见"的静默缺口。
+            // 共线/垂直/平行均已有对应事实类型，在此声明式映射；
+            // 新增事实类型时若对应 claim 未在此映射，会出现"规则推得出、裁决器看不见"的静默缺口。
             ClaimCollinear c => facts.Collinears.FirstOrDefault(f => f == CollinearFact.Create(c.P1Id, c.P2Id, c.P3Id)),
-            ClaimPerpendicular => null,
-            ClaimParallel => null,
+            ClaimPerpendicular c => facts.Perpendiculars.FirstOrDefault(f =>
+                (f.Line1Id == c.Line1Id && f.Line2Id == c.Line2Id) ||
+                (f.Line1Id == c.Line2Id && f.Line2Id == c.Line1Id)),
+            ClaimParallel c => facts.Parallels.FirstOrDefault(f =>
+                (f.Line1Id == c.Line1Id && f.Line2Id == c.Line2Id) ||
+                (f.Line1Id == c.Line2Id && f.Line2Id == c.Line1Id)),
             _ => null
         };
 

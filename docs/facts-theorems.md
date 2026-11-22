@@ -30,6 +30,8 @@
 | `ConcurrentFact` | L1Id, L2Id, L3Id | 三线共点 | Projective | **排序三元组** + 对索引 |
 | `ConjugateDirectionsFact` | Line1Id, Line2Id, ConicId | 两方向关于二次部分共轭 | Affine | 类型视图 |
 | `ConstantSlopeProductFact` | Line1Id, Line2Id, Value | 斜率积为定值 | Affine | 类型视图 |
+| `ParallelFact` | Line1Id, Line2Id | 两线平行（不重合） | Affine | **排序二元组** + 双向索引 |
+| `PerpendicularFact` | Line1Id, Line2Id | 两线垂直 | Similarity | **排序二元组** + 双向索引 |
 
 ## 2. 定理规则（当前 11 条）
 
@@ -46,15 +48,16 @@
 | 9 | Pascal | 六点内接同一非退化曲线 | `CollinearFact`（对边交点） | Projective | 组合型，有成本闸 |
 | 10 | 完全四点形调和性 | 四点为一般位置 | 6 条 `HarmonicFact` | Projective | 组合型，有成本闸 |
 | 11 | Brianchon | 六条切线切同一非退化曲线 | `ConcurrentFact`（主对角线） | Projective | Pascal 对偶 |
+| 12 | 平行传递 | 两条 `ParallelFact` | `ParallelFact` | Affine | 三线互异 + 严通道回验 |
+| 13 | 垂直与平行相容 | `PerpendicularFact` + `ParallelFact` | `PerpendicularFact` | Similarity | 垂直非仿射不变量 |
 
 ## 3. 已知缺口（按优先级）
 
-### 3.1 度量/角度/比例类事实（缺）
+### 3.1 度量/角度/比例类事实（部分已补）
 
 | 计划事实 | 含义 | 等级 | 注意 |
 |---|---|---|---|
-| `ParallelFact` | 两线平行 | Affine | 已在 `ProofJudge` 注释中标记为缺口 |
-| `PerpendicularFact` | 两线垂直 | Similarity | 同上 |
+
 | `AngleEqualFact` | 有向角 ∠ABC ≡ ∠DEF (mod π) | Similarity | 需按 mod π 规范化，否则无法传递 |
 | `SegmentRatioFact` | \|AB\|/\|CD\| = r | Similarity | 长度比是相似不变量，不是仿射不变量 |
 | `AreaRatioFact` | S(ABC)/S(DEF) = r | Affine | 面积比是仿射不变量（行列式比） |

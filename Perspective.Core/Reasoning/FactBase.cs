@@ -47,6 +47,22 @@ public sealed record ConcurrentFact(string L1Id, string L2Id, string L3Id) : Geo
 public sealed record ConjugateDirectionsFact(string Line1Id, string Line2Id, string ConicId) : GeoFact;
 public sealed record ConstantSlopeProductFact(string Line1Id, string Line2Id, ExactScalar Value) : GeoFact;
 
+/// <summary>两直线平行（不重合）。仿射不变量。</summary>
+public sealed record ParallelFact(string Line1Id, string Line2Id) : GeoFact
+{
+    /// <summary>规范化为排序二元组（排列无关去重）。</summary>
+    public static ParallelFact Create(string l1, string l2) =>
+        string.CompareOrdinal(l1, l2) <= 0 ? new(l1, l2) : new(l2, l1);
+}
+
+/// <summary>两直线垂直。相似不变量。</summary>
+public sealed record PerpendicularFact(string Line1Id, string Line2Id) : GeoFact
+{
+    /// <summary>规范化为排序二元组（排列无关去重）。</summary>
+    public static PerpendicularFact Create(string l1, string l2) =>
+        string.CompareOrdinal(l1, l2) <= 0 ? new(l1, l2) : new(l2, l1);
+}
+
 /// <summary>非退化假设：<see cref="Expression"/> 不为零（不参与推导，只限定结论适用域）。</summary>
 public sealed record NonDegenerateAssumption(string Label, ExactScalar Expression);
 
@@ -151,6 +167,8 @@ public sealed class FactBase
     private readonly List<ConcurrentFact> _concurrents = [];
     private readonly List<ConjugateDirectionsFact> _conjugateDirections = [];
     private readonly List<ConstantSlopeProductFact> _slopeProducts = [];
+    private readonly List<ParallelFact> _parallels = [];
+    private readonly List<PerpendicularFact> _perpendiculars = [];
 
     public IReadOnlyList<OnLineFact> OnLines => _onLines;
     public IReadOnlyList<OnConicFact> OnConics => _onConics;
@@ -163,6 +181,8 @@ public sealed class FactBase
     public IReadOnlyList<ConcurrentFact> Concurrents => _concurrents;
     public IReadOnlyList<ConjugateDirectionsFact> ConjugateDirections => _conjugateDirections;
     public IReadOnlyList<ConstantSlopeProductFact> SlopeProducts => _slopeProducts;
+    public IReadOnlyList<ParallelFact> Parallels => _parallels;
+    public IReadOnlyList<PerpendicularFact> Perpendiculars => _perpendiculars;
 
     // --- 按 id 的索引（同上，由 AddFact 增量维护） ---
     private static readonly IReadOnlySet<string> EmptySet = new HashSet<string>();
@@ -172,6 +192,8 @@ public sealed class FactBase
     private readonly Dictionary<string, HashSet<string>> _conicsOfPoint = [];
     private readonly Dictionary<string, HashSet<string>> _pointsOnConic = [];
     private readonly Dictionary<string, List<PolarOfFact>> _polarsOfConic = [];
+    private readonly Dictionary<string, HashSet<string>> _linesParallelTo = [];
+    private readonly Dictionary<string, HashSet<string>> _linesPerpendicularTo = [];
 
     // 幂集事实（三点共线 / 三线共点）无法按单个 id 索引，按"对"索引第三元。
     private readonly Dictionary<string, HashSet<string>> _thirdPointsByPair = [];
@@ -243,6 +265,14 @@ public sealed class FactBase
     /// <summary>已有曲线 id（供规则枚举"每条曲线上的点"）。</summary>
     public IEnumerable<string> ConicIdsWithPoints => _pointsOnConic.Keys;
 
+    /// <summary>与给定直线平行的直线（无序索引）。</summary>
+    public IReadOnlySet<string> LinesParallelTo(string lineId) =>
+        _linesParallelTo.TryGetValue(lineId, out var set) ? set : EmptySet;
+
+    /// <summary>与给定直线垂直的直线（无序索引）。</summary>
+    public IReadOnlySet<string> LinesPerpendicularTo(string lineId) =>
+        _linesPerpendicularTo.TryGetValue(lineId, out var set) ? set : EmptySet;
+
     /// <summary>注册一条新事实（无规则出处：初始条件 / 辅助连线；解释由 Note 承担）。</summary>
     public bool AddFact(GeoFact fact, string note) =>
         AddFactCore(fact, new Derivation(RuleIds.AdHoc, fact, [], note));
@@ -274,6 +304,8 @@ public sealed class FactBase
     {
         CollinearFact f => CollinearFact.Create(f.P1Id, f.P2Id, f.P3Id),
         ConcurrentFact f => ConcurrentFact.Create(f.L1Id, f.L2Id, f.L3Id),
+        ParallelFact f => ParallelFact.Create(f.Line1Id, f.Line2Id),
+        PerpendicularFact f => PerpendicularFact.Create(f.Line1Id, f.Line2Id),
         _ => fact
     };
 
@@ -350,6 +382,18 @@ public sealed class FactBase
 
             case ConstantSlopeProductFact f:
                 _slopeProducts.Add(f);
+                break;
+
+            case ParallelFact f:
+                _parallels.Add(f);
+                Bucket(_linesParallelTo, f.Line1Id).Add(f.Line2Id);
+                Bucket(_linesParallelTo, f.Line2Id).Add(f.Line1Id);
+                break;
+
+            case PerpendicularFact f:
+                _perpendiculars.Add(f);
+                Bucket(_linesPerpendicularTo, f.Line1Id).Add(f.Line2Id);
+                Bucket(_linesPerpendicularTo, f.Line2Id).Add(f.Line1Id);
                 break;
         }
     }

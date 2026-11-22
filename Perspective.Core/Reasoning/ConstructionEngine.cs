@@ -215,7 +215,12 @@ public static class ConstructionEngine
             case ClaimTangentAt c:
                 facts.AddConstructedFact(new TangentFact(c.LineId, c.ConicId, c.TouchPointId), provenance);
                 break;
-            // 平行/垂直：暂无对应事实类型（P1-4 补 ParallelFact/PerpendicularFact），仅验收不登记
+            case ClaimLineParallel c:
+                facts.AddConstructedFact(ParallelFact.Create(c.LineId, c.OtherLineId), provenance);
+                break;
+            case ClaimLinePerpendicular c:
+                facts.AddConstructedFact(PerpendicularFact.Create(c.LineId, c.OtherLineId), provenance);
+                break;
         }
     }
 
