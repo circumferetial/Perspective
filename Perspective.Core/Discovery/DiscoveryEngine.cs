@@ -230,9 +230,19 @@ public static class DiscoveryEngine
             double scale = row.AbsoluteMaximum();
             double Clean(double v) => System.Math.Abs(v) < 1e-9 ? 0 : v;
             var c = row / scale;
+
+            // 数值拟合出的系数只带近似值，分类会标记 IsExact=false（诚实降级，不冒充严格结论）
+            var fitted = Conic.FromGeneralEquation(
+                ExactScalar.FromApprox(c[0]), ExactScalar.FromApprox(c[1]), ExactScalar.FromApprox(c[2]),
+                ExactScalar.FromApprox(c[3]), ExactScalar.FromApprox(c[4]), ExactScalar.FromApprox(c[5]));
+            var cls = ConicTools.Classify(fitted);
+            string kindLabel = cls.Kind == ConicKind.Unknown
+                ? "类型：无法判定"
+                : $"类型：{cls.Kind}（有效层级 {cls.MeaningfulAt}；数值拟合近似分类）";
+
             return new DiscoveryFinding(
                 "发现动点轨迹为圆锥曲线",
-                $"拟合方程: ({Clean(c[0]):G4})x^2 + ({Clean(c[1]):G4})xy + ({Clean(c[2]):G4})y^2 + ({Clean(c[3]):G4})x + ({Clean(c[4]):G4})y + ({Clean(c[5]):G4}) = 0",
+                $"拟合方程: ({Clean(c[0]):G4})x^2 + ({Clean(c[1]):G4})xy + ({Clean(c[2]):G4})y^2 + ({Clean(c[3]):G4})x + ({Clean(c[4]):G4})y + ({Clean(c[5]):G4}) = 0；{kindLabel}",
                 ProofStatus.NumericOnly);
         }
 

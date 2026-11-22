@@ -24,8 +24,10 @@ public enum ConicKind
 /// 分类结果。<see cref="MeaningfulAt"/> 表示该分类断言在哪个视角层级仍有意义：
 /// 椭圆/双曲/抛物只在 Affine 群内可区分（射影视角下它们同构），圆需要 Similarity，
 /// 退化判定在 Projective 下也成立。
+/// <see cref="IsExact"/> 为 false 表示输入含纯近似数据（如数值拟合出的系数），
+/// 分类是按近似符号判定的，不能当作严格结论引用。
 /// </summary>
-public readonly record struct ConicClassification(ConicKind Kind, TransformLevel MeaningfulAt);
+public readonly record struct ConicClassification(ConicKind Kind, TransformLevel MeaningfulAt, bool IsExact);
 
 /// <summary>
 /// 主轴与半轴。半轴以**平方**给出，因为双曲线的"半轴"可能是虚的；
@@ -92,26 +94,29 @@ public static class ConicTools
         var delta = (m.M00 * m.M11 - m.M01 * m.M01).Simplified();
         var det = m.Determinant().Simplified();
 
-        int? sDelta = TrySign(delta);
-        int? sDet = TrySign(det);
+        var sDelta = TrySign(delta);
+        var sDet = TrySign(det);
         if (sDelta is null || sDet is null)
-            return new ConicClassification(ConicKind.Unknown, TransformLevel.Projective);
+            return new ConicClassification(ConicKind.Unknown, TransformLevel.Projective, false);
 
-        if (sDet != 0)
+        bool exact = sDelta.Value.Exact && sDet.Value.Exact;
+        int d2 = sDelta.Value.Sign, d3 = sDet.Value.Sign;
+
+        if (d3 != 0)
         {
-            if (sDelta == 0)
-                return new ConicClassification(ConicKind.Parabola, TransformLevel.Affine);
+            if (d2 == 0)
+                return new ConicClassification(ConicKind.Parabola, TransformLevel.Affine, exact);
 
-            if (sDelta > 0)
+            if (d2 > 0)
             {
                 var trace = m.M00 + m.M11;
                 bool isCircle = (trace * trace - 4 * delta).VerifyStrictZero() == StrictResult.StrictlyTrue;
                 return isCircle
-                    ? new ConicClassification(ConicKind.Circle, TransformLevel.Similarity)
-                    : new ConicClassification(ConicKind.Ellipse, TransformLevel.Affine);
+                    ? new ConicClassification(ConicKind.Circle, TransformLevel.Similarity, exact)
+                    : new ConicClassification(ConicKind.Ellipse, TransformLevel.Affine, exact);
             }
 
-            return new ConicClassification(ConicKind.Hyperbola, TransformLevel.Affine);
+            return new ConicClassification(ConicKind.Hyperbola, TransformLevel.Affine, exact);
         }
 
         // Δ = 0：退化。先看秩（adj 是否全零 ⇒ 秩 ≤ 1）
@@ -123,14 +128,14 @@ public static class ConicTools
             bool zeroMatrix = AllStrictlyZero(
                 m.M00, m.M01, m.M02, m.M10, m.M11, m.M12, m.M20, m.M21, m.M22);
             return zeroMatrix
-                ? new ConicClassification(ConicKind.Unknown, TransformLevel.Projective)
-                : new ConicClassification(ConicKind.DoubleLine, TransformLevel.Projective);
+                ? new ConicClassification(ConicKind.Unknown, TransformLevel.Projective, false)
+                : new ConicClassification(ConicKind.DoubleLine, TransformLevel.Projective, exact);
         }
 
-        if (sDelta > 0)
-            return new ConicClassification(ConicKind.Point, TransformLevel.Projective);
-        if (sDelta < 0)
-            return new ConicClassification(ConicKind.TwoIntersectingLines, TransformLevel.Projective);
+        if (d2 > 0)
+            return new ConicClassification(ConicKind.Point, TransformLevel.Projective, exact);
+        if (d2 < 0)
+            return new ConicClassification(ConicKind.TwoIntersectingLines, TransformLevel.Projective, exact);
 
         // δ = 0 且秩 2：平行线族，T = (M₀₂²M₀₀ + 2M₀₂M₁₂M₀₁ + M₁₂²M₁₁) − M₂₂(M₀₀+M₁₁)²
         var t = (m.M02 * m.M02 * m.M00
@@ -138,14 +143,18 @@ public static class ConicTools
                + m.M12 * m.M12 * m.M11
                - m.M22 * (m.M00 + m.M11) * (m.M00 + m.M11)).Simplified();
 
-        int? sT = TrySign(t);
-        return sT switch
+        var sT = TrySign(t);
+        if (sT is null)
+            return new ConicClassification(ConicKind.Unknown, TransformLevel.Projective, false);
+
+        exact &= sT.Value.Exact;
+        var kind = sT.Value.Sign switch
         {
-            > 0 => new ConicClassification(ConicKind.TwoParallelLines, TransformLevel.Projective),
-            0 => new ConicClassification(ConicKind.DoubleLine, TransformLevel.Projective),
-            < 0 => new ConicClassification(ConicKind.Empty, TransformLevel.Projective),
-            _ => new ConicClassification(ConicKind.Unknown, TransformLevel.Projective)
+            > 0 => ConicKind.TwoParallelLines,
+            0 => ConicKind.DoubleLine,
+            _ => ConicKind.Empty
         };
+        return new ConicClassification(kind, TransformLevel.Projective, exact);
     }
 
     /// <summary>
@@ -164,8 +173,10 @@ public static class ConicTools
         var m = conic.Matrix;
         var delta = (m.M00 * m.M11 - m.M01 * m.M01).Simplified();
 
-        if (TrySign(delta) is null or 0) return null;                 // 抛物线 / 退化
-        if (TrySign(m.Determinant().Simplified()) is null or 0) return null;
+        var signDelta = TrySign(delta);
+        if (signDelta is null || signDelta.Value.Sign == 0) return null;        // 抛物线 / 退化
+        var signDet = TrySign(m.Determinant().Simplified());
+        if (signDet is null || signDet.Value.Sign == 0) return null;            // 退化
 
         // 中心 = adj(C)·(0,0,1)，其 W 分量恰为 δ
         var adj = m.Adjugate();
@@ -227,18 +238,26 @@ public static class ConicTools
     }
 
     /// <summary>
-    /// 严格定号：0 / +1 / −1；无法严格判定时返回 null（绝不猜）。
-    /// 只有能化简为具体实数时才定号，复杂符号表达式一律判"未知"。
+    /// 定号：返回 (符号, 是否严格)。
+    /// 严格 = 由符号引擎化简为具体实数后定号（可当结论引用）；
+    /// 非严格 = 纯近似数据按数值定号（仅供发现引擎等近似场景，不能当严格结论）；
+    /// 复杂符号表达式无法判定时返回 null，绝不猜。
     /// </summary>
-    private static int? TrySign(ExactScalar value)
+    private static (int Sign, bool Exact)? TrySign(ExactScalar value)
     {
-        if (value.VerifyStrictZero() == StrictResult.StrictlyTrue) return 0;
-        if (value.Exact is null) return null;          // 纯近似数据：不判
+        if (value.VerifyStrictZero() == StrictResult.StrictlyTrue) return (0, true);
+
+        if (value.Exact is null)
+        {
+            if (!double.IsFinite(value.Approx)) return null;
+            if (System.Math.Abs(value.Approx) <= 1e-9) return (0, false);
+            return (value.Approx > 0 ? 1 : -1, false);
+        }
 
         var simplified = value.Exact.Simplify();
         if (simplified is not Entity.Number number) return null;
 
         double v = (double)number.EvalNumerical();
-        return v > 0 ? 1 : (v < 0 ? -1 : 0);
+        return (v > 0 ? 1 : (v < 0 ? -1 : 0), true);
     }
 }

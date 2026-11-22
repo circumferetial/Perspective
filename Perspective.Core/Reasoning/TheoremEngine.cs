@@ -325,3 +325,107 @@ public readonly struct ConicMidpointSlopeRule : IFactRule<ConicMidpointSlopeRule
         return count;
     }
 }
+
+/// <summary>
+/// 命题 5：极线基本定理——曲线上的点的极线就是该点处的切线。
+/// 【前提】① P 在曲线 C 上（严格回验 ContainsStrictly）；② L 是 P 的极线
+///         （ConicTools.IsPolarLine 严通道回验，不信任 PolarOfFact 标签）。
+/// 【结论】TangentFact(L, C, P)：L 切 C 于 P。
+/// 【推导】P 在曲线上 ⟹ PᵀCP = 0；极线 l = C·P 过 P（PᵀCP = 0 即 l·P = 0），且
+///         与曲线只有 P 一个交点（代入 l 的判别式为 0），故 l 为切线。
+///         本规则的作用是**让 TangentFact 第一次可以被自动生成**，闭合
+///         OnConic → Polar → Tangent 循环，从而为切点弦极线定理提供前提。
+/// 【等级】Projective。
+/// </summary>
+public readonly struct PolarFundamentalRule : IFactRule<PolarFundamentalRule>
+{
+    public static string Title => "极线基本定理";
+    public static TransformLevel RequiredLevel => TransformLevel.Projective;
+
+    public static int Apply(FactBase facts)
+    {
+        int count = 0;
+
+        foreach (var polar in facts.Polars)
+        {
+            // 廉价前提先行：非曲线上的点，极线不一定是切线
+            if (!facts.HasOnConic(polar.PoleId, polar.ConicId)) continue;
+
+            var conic = facts.Conics[polar.ConicId];
+            var pole = facts.Points[polar.PoleId];
+
+            if (conic.ContainsStrictly(pole) != StrictResult.StrictlyTrue) continue;
+            if (ConicTools.IsPolarLine(conic, pole, facts.Lines[polar.LineId]) != StrictResult.StrictlyTrue) continue;
+
+            if (facts.AddFact(new TangentFact(polar.LineId, polar.ConicId, polar.PoleId),
+                $"[{Title}] {polar.PoleId} 在曲线 {polar.ConicId} 上且 {polar.LineId} 是其极线 => {polar.LineId} 切曲线于 {polar.PoleId}"))
+                count++;
+        }
+
+        return count;
+    }
+}
+
+/// <summary>
+/// 命题 6：共轭直径平分弦——点差法的逆命题。
+/// 【前提】① 曲线有心非退化（Ellipse/Circle/Hyperbola）；② 已知共轭方向事实
+///         ConjugateDirectionsFact(OM, AB, C)；③ 弦 AB 与曲线恰有 2 个已登记交点；
+///         ④ 交点 M = OM ∩ AB 是已登记的有限点；⑤ 严通道回验 A、B 在曲线上且
+///         M 严格是 AB 中点（防止事实库污染）。
+/// 【结论】MidpointFact(M, A, B)。
+/// 【推导】设中心 O，弦方向 d，弦上一点 M。若 dᵀC₂(M−O) = 0，则沿弦取 M ± t·d，
+///         两点的二次型值相等（因为线性项 2t·dᵀC₂(M−O) = 0），故两点同时落在曲线上
+///         ⟹ M 就是弦 AB 的中点。这正是点差法结论的逆命题。
+/// 【等级】Affine。
+/// </summary>
+public readonly struct ConjugateDiameterBisectsChordRule : IFactRule<ConjugateDiameterBisectsChordRule>
+{
+    public static string Title => "共轭直径平分弦定理";
+    public static TransformLevel RequiredLevel => TransformLevel.Affine;
+
+    public static int Apply(FactBase facts)
+    {
+        int count = 0;
+
+        foreach (var conj in facts.ConjugateDirections)
+        {
+            if (!facts.Conics.TryGetValue(conj.ConicId, out var conic)) continue;
+
+            var kind = ConicTools.Classify(conic).Kind;
+            if (kind is not (ConicKind.Ellipse or ConicKind.Circle or ConicKind.Hyperbola)) continue;
+
+            // 弦上的曲线交点应恰为两个
+            var onChord = facts.PointsOn(conj.Line2Id)
+                .Where(pid => facts.HasOnConic(pid, conj.ConicId))
+                .ToList();
+            if (onChord.Count != 2) continue;
+
+            // M = OM ∩ AB；必须是已登记的有限点
+            var inter = HLine.Intersect(facts.Lines[conj.Line1Id], facts.Lines[conj.Line2Id]);
+            if (inter.IsAtInfinity) continue;
+
+            string? midId = null;
+            foreach (var (pid, pt) in facts.Points)
+                if (PointTools.SameStrictly(pt, inter) == StrictResult.StrictlyTrue)
+                {
+                    midId = pid;
+                    break;
+                }
+            if (midId is null) continue;
+
+            var ptM = facts.Points[midId];
+            var ptA = facts.Points[onChord[0]];
+            var ptB = facts.Points[onChord[1]];
+
+            if (GeometryAudit.IsMidpoint(ptM, ptA, ptB) != StrictResult.StrictlyTrue) continue;
+            if (conic.ContainsStrictly(ptA) != StrictResult.StrictlyTrue) continue;
+            if (conic.ContainsStrictly(ptB) != StrictResult.StrictlyTrue) continue;
+
+            if (facts.AddFact(new MidpointFact(midId, onChord[0], onChord[1]),
+                $"[{Title}] 弦 {conj.Line2Id} 与直径 {conj.Line1Id} 共轭 => 交点 {midId} 是弦 {onChord[0]}{onChord[1]} 的中点"))
+                count++;
+        }
+
+        return count;
+    }
+}
