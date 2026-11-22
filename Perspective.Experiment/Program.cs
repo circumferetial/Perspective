@@ -68,5 +68,6 @@ public static class Program
         var pencil = new Vec3(l1.V.X + l2.V.X, l1.V.Y + l2.V.Y, l1.V.Z + l2.V.Z);
         Console.WriteLine($"线系 λ=μ=1 的元素 = ({pencil.X}, {pencil.Y}, {pencil.Z})，过公共点 (1,0)? " +
                           $"{Vec3.Point(1, 0).Incident(pencil)}");
+        ConstraintLadder.Run();
     }
 }
