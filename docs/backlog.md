@@ -201,3 +201,37 @@ Proof IR 稳定后，SemanticStep 编译成 Lean 骨架，OracleStep 对接 `pol
 | G5 构形模型库（矩形/平行四边形/内接等约束的声明式建模） | 2023(2) | P2 |
 | G6 度量求解组合（距离方程 + 角度求值的求解入口） | 2020(2) | P1 新增 |
 | G7 题型模板（ProblemSpec：定点/定值/弦族斜率/最值/范围） | 全部 | P0-2 扩展 |
+## M3 设计草案：题型模板（怎么模板化）
+
+**核心判断**：模板不是"输入题目文字"，而是**声明式描述题型骨架 + 调用方填槽**。
+文字 → 陈设 是上游（人/LLM/前端）的事；模板接收的是**陈设（场景对象与已知事实）+ 槽位**。
+
+```
+陈设（Scene） = FactBase（点/线/圆锥曲线/分段曲线 + 已知事实） + 参数表
+模板（Template） = 目标形状 + 求解管线 + 输出格式
+结果（Answer） = 精确值/表达式 + 是否可达 + 严格/非严格 + 步骤链（Derivation/OracleStep）
+```
+
+| 模板 | 输入槽位 | 内部管线 | 覆盖真题 |
+|---|---|---|---|
+| `FixedPointTemplate` | 参数 + 线族 `Func<ExactScalar,HLine>` | DiscoveryEngine.DiscoverFixedPoint + 严格验证 | 2022 全国乙 20(2) |
+| `ChordSlopeTemplate` | 曲线 + 曲线上点 + 约束类型 | SolveChordSlopeForZeroSlopeSum | 2022 新高考Ⅰ 21(1) |
+| `AreaFromTangentTemplate` | 曲线 + 顶点 + 弦斜率 + tan 目标 | SolveAreaFromTangent | 2022 新高考Ⅰ 21(2) |
+| `UnivariateExtremumTemplate` | 变量 + 目标 + 定义域 | ExtremumSolver（+神谕闭合） | 2022 浙江 21 |
+| `ReductionCertificateTemplate` | 归约提案 + 内层/外层证书分支 | ReductionVerifier + InequalityCertificateVerifier | 2023 新高考Ⅰ 22(2) |
+| `PiecewiseEvaluationTemplate` | 分段曲线 + 直线/点条件 | PiecewiseConic + Metric + RealSets | 2020 上海 20 |
+
+**模板不重写数学**：每个模板只做"装配 + 输出格式化 + 严格性/可达性标注"；
+数学仍由已有组件完成。验收标准：现有 5 道真题测试改为**调用模板**后仍通过。
+
+## FLINT 直连 vs Python：分层，不是替代
+
+| 能力 | 后端 |
+|---|---|
+| 多项式结式/因式分解/GCD/大整数运算 | FLINT（C 直连，快、零 Python） |
+| 一般符号化简、含根式/超越的求解 | SymPy 或 AngouriMath（保留） |
+| 进程内表达式树/严通道 | AngouriMath（默认） |
+
+**不会丧失能力**：`ISymbolicBackend` 已抽象，后端可并存、按操作分派（谁擅长谁上）。
+仅把"多项式重活"从 Python 迁到 C；Simplify/Solve 这类 SymPy 强项保留。
+**许可证注意**：FLINT 是 LGPL；若将来公开分发，需保留许可证声明并保证可替换动态库。
