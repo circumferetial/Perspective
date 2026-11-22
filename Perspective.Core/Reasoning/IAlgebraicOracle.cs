@@ -31,6 +31,11 @@ public sealed record OracleVerdict(OracleVerdictKind Kind, string? Model = null,
 /// 因此结果是 <see cref="OracleVerdictKind"/> 而不是证明文本。
 /// </para>
 /// <para>
+/// 【责任边界】判定结果的**确定性与完备性由外部判定器（如 Z3）承担**，本项目不为其正确性背书；
+/// 本项目负责的是：约束编码是否正确、是否如实转述结论（不得伪造推导）。
+/// 若外部判定器返回 Unknown 或编码失败，必须如实上报，不得当成"真/假"使用。
+/// </para>
+/// <para>
 /// 【契约】<see cref="DecideExists"/> 判定 <c>∃(vars) [constraints 的合取]</c> 在实数中是否可满足。
 /// 全称命题通过取反归结为存在命题（见 <see cref="DecideUniversal"/>）。
 /// </para>
