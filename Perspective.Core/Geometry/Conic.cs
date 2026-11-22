@@ -194,6 +194,15 @@ public readonly record struct Conic(Matrix3x3 Matrix)
             rCr * knownPoint.W - two * mCr * r.W);
     }
     
+    /// <summary>
+    /// 把本标准位置曲线按给定射影/仿射变换搬运过去：C′ = M⁻ᵀ·C·M⁻¹。
+    /// 【用法】平移/旋转/伸缩统一用矩阵组合，不必为每种变换手写方程：
+    ///   var m = Matrix3x3.Translation(cx, cy) * Matrix3x3.Rotation(cos, sin) * Matrix3x3.Scale(a, b);
+    ///   var conic = Conic.Circle(0, 0, 1).Transformed(m);
+    /// 【等级】任意可逆变换均可用；仿射变换保"有心/抛物"，射影变换不保圆与轴。
+    /// </summary>
+    public Conic Transformed(Matrix3x3 transform) => transform.Transform(this);
+
     /// <summary>构造圆：(x - cx)^2 + (y - cy)^2 = r^2</summary>
     public static Conic Circle(ExactScalar cx, ExactScalar cy, ExactScalar r) =>
         FromGeneralEquation(1, 0, 1, -2 * cx, -2 * cy, cx * cx + cy * cy - r * r);

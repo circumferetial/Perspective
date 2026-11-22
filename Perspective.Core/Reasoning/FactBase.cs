@@ -14,6 +14,7 @@ public sealed record PolarOfFact(string LineId, string PoleId, string ConicId) :
 public sealed record CenterOfConicFact(string CenterId, string ConicId) : GeoFact;
 public sealed record MidpointFact(string MidId, string AId, string BId) : GeoFact;
 public sealed record HarmonicFact(string AId, string BId, string CId, string DId) : GeoFact;
+public sealed record ConjugateDirectionsFact(string Line1Id, string Line2Id, string ConicId) : GeoFact;
 public sealed record ConstantSlopeProductFact(string Line1Id, string Line2Id, ExactScalar Value) : GeoFact;
 
 /// <summary>
@@ -44,6 +45,7 @@ public sealed class FactBase
     private readonly List<CenterOfConicFact> _centers = [];
     private readonly List<MidpointFact> _midpoints = [];
     private readonly List<HarmonicFact> _harmonics = [];
+    private readonly List<ConjugateDirectionsFact> _conjugateDirections = [];
     private readonly List<ConstantSlopeProductFact> _slopeProducts = [];
 
     public IReadOnlyList<OnLineFact> OnLines => _onLines;
@@ -53,6 +55,7 @@ public sealed class FactBase
     public IReadOnlyList<CenterOfConicFact> Centers => _centers;
     public IReadOnlyList<MidpointFact> Midpoints => _midpoints;
     public IReadOnlyList<HarmonicFact> Harmonics => _harmonics;
+    public IReadOnlyList<ConjugateDirectionsFact> ConjugateDirections => _conjugateDirections;
     public IReadOnlyList<ConstantSlopeProductFact> SlopeProducts => _slopeProducts;
 
     // --- 按 id 的索引（同上，由 AddFact 增量维护） ---
@@ -164,6 +167,10 @@ public sealed class FactBase
 
             case HarmonicFact f:
                 _harmonics.Add(f);
+                break;
+
+            case ConjugateDirectionsFact f:
+                _conjugateDirections.Add(f);
                 break;
 
             case ConstantSlopeProductFact f:

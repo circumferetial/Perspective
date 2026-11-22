@@ -233,19 +233,21 @@ public readonly struct HarmonicPolarBundleRule : IFactRule<HarmonicPolarBundleRu
 
 /// <summary>
 /// 命题 4：有心圆锥曲线点差法（仅 Affine 及以上视角有效！切到 Projective 自动屏蔽）
-/// 【前提】① 交叉项 M₀₁ 严格为 0（VerifyStrictZero 回验）——符号验证确认含 xy 项时
-///         公式失效，此为必要前提；② a = M₀₀ ≠ 0 且 c = M₁₁ ≠ 0（有心非退化；
-///         抛物线无有限中心，不会注册 CenterOfConicFact，自然排除）；③ M 严格为
-///         AB 中点（IsMidpoint 回验）；④ A、B 严格在曲线上（ContainsStrictly 回验）；
-///         ⑤ O 为曲线中心（CenterOfConicFact）。注意：**不要求中心在原点**——
-///         符号验证确认公式对平移后的曲线（d,e 任意）依然恒等。
-/// 【结论】k_OM · k_AB = −M₀₀/M₁₁。
-/// 【推导】设 A = (u+t, v+s)、B = (u−t, v−s)、M = (u,v)。f(A) = f(B) = 0 相减：
-///         4a·u·t + 4c·v·s + 2d·t + 2e·s = 0 ⟹ k_AB = s/t = −(2a·u+d)/(2c·v+e)。
-///         中心 O = (−d/2a, −e/2c) ⟹ k_OM = (v+e/2c)/(u+d/2a)。
-///         两式相乘，(2a·u+d) 与 (2c·v+e) 恰好约去，得 −a/c = −M₀₀/M₁₁。
-///         含 xy 项时相减多出 4b(x₀s + y₀t) 项，约简不再发生，公式失效。
-/// 【等级】Affine——中点与斜率积在射影变换下不保持。
+/// 【前提】① 有心非退化（δ = M₀₀M₁₁ − M₀₁² ≠ 0 且 Δ = det C ≠ 0；抛物线无有限中心、
+///         退化曲线不适用，由 ConicTools.Classify 判定）；② M 严格为 AB 中点
+///         （IsMidpoint 回验）；③ A、B 严格在曲线上（ContainsStrictly 回验）；
+///         ④ O 为曲线中心（CenterOfConicFact）。
+/// 【结论】**共轭方向**：d_ABᵀ · C₂ · (M − O) = 0，其中 C₂ 为二次部分 [[M₀₀,M₀₁],[M₀₁,M₁₁]]。
+///         当曲线无交叉项（M₀₁ = 0）且斜率有限时，进一步导出特例
+///         k_OM · k_AB = −M₀₀/M₁₁。
+/// 【推导】把原点平移到中心 O：f(X) = XᵀC₂X + c′。弦上两点 M ± t·d 都在曲线上，
+///         两式相减得 4t·dᵀC₂(M−O) = 0 ⇒ dᵀC₂(M−O) = 0——这是坐标无关的共轭条件
+///         （双曲/椭圆/圆统一成立，与曲线是否轴对齐无关）。
+///         轴对齐时取 d = (1, k_AB)、M−O ∝ (1, k_OM)，代入得
+///         M₀₀ + M₁₁·k_AB·k_OM = 0，即 k_OM·k_AB = −M₀₀/M₁₁。
+/// 【为什么不是直接旋转后套斜率公式】斜率是欧氏量，坐标旋转后 k 会变，
+///         原坐标系里的 k_OM·k_AB 就不再是 −M₀₀/M₁₁；能保持形式的是共轭关系本身。
+/// 【等级】Affine——中点与共轭方向在射影变换下不保持。
 /// </summary>
 public readonly struct ConicMidpointSlopeRule : IFactRule<ConicMidpointSlopeRule>
 {
@@ -261,9 +263,13 @@ public readonly struct ConicMidpointSlopeRule : IFactRule<ConicMidpointSlopeRule
         foreach (var cen in centers)
         {
             var conic = facts.Conics[cen.ConicId];
-            // 交叉项必须严格为 0：点差法的 -M00/M11 公式仅对无 xy 项的有心二次曲线成立。
-            // 用严通道而非数值容差，避免“交叉项很小但不为 0”的曲线被误判为可用。
-            if (conic.Matrix.M01.VerifyStrictZero() != StrictResult.StrictlyTrue) continue;
+
+            // 前提：有心非退化曲线（椭圆/圆/双曲）。抛物线无有限中心，退化曲线不适用。
+            var kind = ConicTools.Classify(conic).Kind;
+            if (kind is not (ConicKind.Ellipse or ConicKind.Circle or ConicKind.Hyperbola)) continue;
+
+            var center = facts.Points[cen.CenterId];
+            var m = conic.Matrix;
 
             foreach (var mid in midpoints)
             {
@@ -282,11 +288,33 @@ public readonly struct ConicMidpointSlopeRule : IFactRule<ConicMidpointSlopeRule
                 string lineOM = facts.GetOrCreateLine(cen.CenterId, mid.MidId);
                 string lineAB = facts.GetOrCreateLine(mid.AId, mid.BId);
 
+                // 弦方向（齐次无穷远点）：直线 A·x + B·y + C = 0 的方向为 (−B, A)
+                var chordDir = new HPoint(-facts.Lines[lineAB].B, facts.Lines[lineAB].A, 0);
+
+                // M − O 的齐次表示（两点均为有限点）
+                var mx = ptM.X * center.W - center.X * ptM.W;
+                var my = ptM.Y * center.W - center.Y * ptM.W;
+                var mw = ptM.W * center.W;
+
+                // 共轭判据 dᵀ·C·(M−O) = 0；d 的 W 分量为 0，故自动只命中二次部分
+                var conj = chordDir.X * (m.M00 * mx + m.M01 * my + m.M02 * mw)
+                         + chordDir.Y * (m.M10 * mx + m.M11 * my + m.M12 * mw)
+                         + chordDir.W * (m.M20 * mx + m.M21 * my + m.M22 * mw);
+
+                if (conj.VerifyStrictZero() != StrictResult.StrictlyTrue) continue;
+
+                if (facts.AddFact(new ConjugateDirectionsFact(lineOM, lineAB, cen.ConicId),
+                    $"[{Title}] {mid.MidId} 为弦 {mid.AId}{mid.BId} 中点 => 弦方向与 O{mid.MidId} 关于二次部分共轭"))
+                    count++;
+
+                // 特例：无交叉项且斜率有限时，额外给出斜率积定值 −M₀₀/M₁₁
+                if (m.M01.VerifyStrictZero() != StrictResult.StrictlyTrue) continue;
+
                 var k1 = facts.Lines[lineOM].TryGetSlope();
                 var k2 = facts.Lines[lineAB].TryGetSlope();
                 if (k1 is null || k2 is null) continue;
 
-                var expected = (-conic.Matrix.M00 / conic.Matrix.M11).Simplified();
+                var expected = (-m.M00 / m.M11).Simplified();
                 if ((k1.Value * k2.Value - expected).VerifyStrictZero() != StrictResult.StrictlyTrue) continue;
 
                 if (facts.AddFact(new ConstantSlopeProductFact(lineOM, lineAB, expected),
