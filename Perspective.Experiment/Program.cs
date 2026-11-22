@@ -69,5 +69,6 @@ public static class Program
         Console.WriteLine($"线系 λ=μ=1 的元素 = ({pencil.X}, {pencil.Y}, {pencil.Z})，过公共点 (1,0)? " +
                           $"{Vec3.Point(1, 0).Incident(pencil)}");
         ConstraintLadder.Run();
+        StructureLadder.Run();
     }
 }
