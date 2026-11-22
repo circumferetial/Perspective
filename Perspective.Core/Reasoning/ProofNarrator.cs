@@ -20,6 +20,13 @@ public static class ProofNarrator
         RuleIds.PolePolarReciprocity => RenderLaHire(derivation),
         RuleIds.CollinearFromCommonLine => RenderCommonLine(derivation),
         RuleIds.Pascal => RenderPascal(derivation),
+        RuleIds.HarmonicPolarBundle => RenderHarmonicBundle(derivation),
+        RuleIds.ConicMidpointSlope => RenderMidpointSlope(derivation),
+        RuleIds.PolarFundamental => RenderPolarFundamental(derivation),
+        RuleIds.ConjugateDiameterBisectsChord => RenderConjugateDiameter(derivation),
+        RuleIds.ConcurrentFromCommonPoint => RenderConcurrent(derivation),
+        RuleIds.CompleteQuadrangleHarmonic => RenderQuadrangle(derivation),
+        RuleIds.Brianchon => RenderBrianchon(derivation),
         _ => derivation.Note ?? "（规则已记录，但解释层尚未提供模板）"
     };
 
@@ -70,6 +77,77 @@ public static class ProofNarrator
         string hexagon = string.Concat(onConic.Take(6).Select(x => x.PointId));
         return $"六边形 {hexagon} 内接于曲线 {onConic[0].ConicId}，由 Pascal 定理，"
              + $"三组对边交点 {collinear.P1Id}、{collinear.P2Id}、{collinear.P3Id} 共线";
+    }
+
+    private static string RenderHarmonicBundle(Derivation d)
+    {
+        if (d.Fact is not HarmonicFact harmonic) return Fallback(d);
+        var polar = d.Premises.OfType<PolarOfFact>().FirstOrDefault();
+        if (polar is null) return Fallback(d);
+
+        // 割线 = 过极点、但不是极线本身的那条线
+        var secant = d.Premises.OfType<OnLineFact>()
+            .FirstOrDefault(x => x.PointId == polar.PoleId && x.LineId != polar.LineId);
+
+        string secDesc = secant is null ? "" : $"割线 {secant.LineId} ";
+        return $"{secDesc}过 {polar.PoleId}，交极线 {polar.LineId} 于 {harmonic.BId}、"
+             + $"交曲线于 {harmonic.CId}、{harmonic.DId}，故 ({harmonic.AId},{harmonic.BId};{harmonic.CId},{harmonic.DId}) = -1";
+    }
+
+    private static string RenderMidpointSlope(Derivation d)
+    {
+        var midpoint = d.Premises.OfType<MidpointFact>().FirstOrDefault();
+        string chord = midpoint is null ? "AB" : $"{midpoint.AId}{midpoint.BId}";
+
+        return d.Fact switch
+        {
+            ConjugateDirectionsFact conj =>
+                $"{midpoint?.MidId} 是弦 {chord} 的中点，故弦方向与 {conj.Line1Id} 关于曲线二次部分共轭",
+            ConstantSlopeProductFact slope =>
+                $"{midpoint?.MidId} 是弦 {chord} 的中点，故斜率之积 k({slope.Line1Id}) · k({slope.Line2Id}) = {slope.Value}（= −M₀₀/M₁₁）",
+            _ => Fallback(d)
+        };
+    }
+
+    private static string RenderPolarFundamental(Derivation d)
+    {
+        if (d.Fact is not TangentFact tangent) return Fallback(d);
+        return $"{tangent.TouchPointId} 在曲线 {tangent.ConicId} 上，其极线 {tangent.LineId} 就是过该点的切线";
+    }
+
+    private static string RenderConjugateDiameter(Derivation d)
+    {
+        if (d.Fact is not MidpointFact midpoint) return Fallback(d);
+        var conj = d.Premises.OfType<ConjugateDirectionsFact>().FirstOrDefault();
+        if (conj is null) return Fallback(d);
+
+        return $"弦 {midpoint.AId}{midpoint.BId} 与直径 {conj.Line1Id} 共轭，其交点 {midpoint.MidId} 即为该弦的中点";
+    }
+
+    private static string RenderConcurrent(Derivation d)
+    {
+        var onLines = d.Premises.OfType<OnLineFact>().ToList();
+        if (onLines.Count < 3) return Fallback(d);
+
+        string lines = string.Join("、", onLines.Take(3).Select(x => x.LineId));
+        return $"{lines} 同过点 {onLines[0].PointId}，故三线共点";
+    }
+
+    private static string RenderQuadrangle(Derivation d)
+    {
+        if (d.Fact is not HarmonicFact harmonic) return Fallback(d);
+        return $"由完全四点形的调和性质，边 {harmonic.AId}{harmonic.BId} 上 "
+             + $"({harmonic.AId},{harmonic.BId};{harmonic.CId},{harmonic.DId}) = -1";
+    }
+
+    private static string RenderBrianchon(Derivation d)
+    {
+        var tangents = d.Premises.OfType<TangentFact>().ToList();
+        if (tangents.Count < 6 || d.Fact is not ConcurrentFact concurrent) return Fallback(d);
+
+        string lines = string.Join("、", tangents.Take(6).Select(x => x.LineId));
+        return $"六边形外切于曲线 {tangents[0].ConicId}（边 {lines}），由 Brianchon 定理，"
+             + $"三条主对角线 {concurrent.L1Id}、{concurrent.L2Id}、{concurrent.L3Id} 共点";
     }
 
     private static string Fallback(Derivation d) =>

@@ -170,8 +170,10 @@ public sealed class FactBase
     /// <summary>
     /// 注册一条由规则推出的事实：**只记录结构化前提**（规则 id + 前提事实），不携带自然语言。
     /// 解释文本由 <see cref="ProofNarrator"/> 统一渲染。
+    /// 【命名说明】刻意与 <see cref="AddFact"/> 分开：零前提时 params 重载会与"note 重载"
+    /// 产生重载歧义，导致规则记录被误当成初始条件。
     /// </summary>
-    public bool AddFact(GeoFact fact, string ruleId, params GeoFact[] premises) =>
+    public bool AddDerivedFact(GeoFact fact, string ruleId, params GeoFact[] premises) =>
         AddFactCore(fact, new Derivation(ruleId, fact, premises));
 
     private bool AddFactCore(GeoFact fact, Derivation derivation)

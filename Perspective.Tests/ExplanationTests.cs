@@ -100,9 +100,9 @@ public class ExplanationTests
         Assert.Contains("内接", text);
     }
 
-    // ---------- 未迁移规则：回退到 Note ----------
+    // ---------- 极线基本定理（第二步迁移） ----------
     [Fact]
-    public void UnmigratedRule_FallsBackToNote()
+    public void PolarFundamental_NowUsesStructuredDerivation()
     {
         var circle = Scenes.Circle4;
         var facts = new FactBase { CurrentLevel = TransformLevel.Projective };
@@ -116,9 +116,93 @@ public class ExplanationTests
         new TheoremEngine().Register<PolarFundamentalRule>().RunToFixedPoint(facts);
 
         var d = facts.DerivationLog.Single(x => x.Fact is TangentFact);
-        Assert.Equal(RuleIds.AdHoc, d.RuleId);   // 尚未迁移：仍带 Note
-        Assert.False(string.IsNullOrEmpty(d.Note));
-        Assert.Equal(d.Note, ProofNarrator.Render(facts, d));
+        Assert.Equal(RuleIds.PolarFundamental, d.RuleId);
+        Assert.Null(d.Note);
+        Assert.Contains("切线", ProofNarrator.Render(facts, d));
+    }
+
+    // ---------- 点差法：两种结论共用同一规则 id ----------
+    [Fact]
+    public void MidpointSlope_RendersConjugateAndSlopeProduct()
+    {
+        var ellipse = Scenes.Ellipse4x3;
+        var a = HPoint.FromFormula("2", "0");
+        var b = HPoint.FromFormula("0", "sqrt(3)");
+        var m = HPoint.FromFormula("1", "sqrt(3)/2");
+
+        var facts = new FactBase { CurrentLevel = TransformLevel.Affine };
+        facts.AddConic("E", ellipse);
+        facts.AddPoint("O", HPoint.FromCartesian(0, 0));
+        facts.AddPoint("A", a);
+        facts.AddPoint("B", b);
+        facts.AddPoint("M", m);
+        facts.AddFact(new CenterOfConicFact("O", "E"), "初始");
+        facts.AddFact(new OnConicFact("A", "E"), "初始");
+        facts.AddFact(new OnConicFact("B", "E"), "初始");
+        facts.AddFact(new MidpointFact("M", "A", "B"), "初始");
+
+        new TheoremEngine().Register<ConicMidpointSlopeRule>().RunToFixedPoint(facts);
+
+        var conj = facts.DerivationLog.Single(x => x.RuleId == RuleIds.ConicMidpointSlope && x.Fact is ConjugateDirectionsFact);
+        Assert.Null(conj.Note);
+        Assert.Contains("共轭", ProofNarrator.Render(facts, conj));
+
+        var slope = facts.DerivationLog.Single(x => x.RuleId == RuleIds.ConicMidpointSlope && x.Fact is ConstantSlopeProductFact);
+        Assert.Null(slope.Note);
+        Assert.Contains("斜率", ProofNarrator.Render(facts, slope));
+    }
+
+    // ---------- 三线共点 ----------
+    [Fact]
+    public void Concurrent_RendersCommonPoint()
+    {
+        var facts = new FactBase { CurrentLevel = TransformLevel.Projective };
+        facts.AddPoint("O", HPoint.FromCartesian(0, 0));
+        facts.AddLine("L1", new HLine(0, 1, 0));
+        facts.AddLine("L2", new HLine(1, 0, 0));
+        facts.AddLine("L3", new HLine(1, -1, 0));
+        foreach (var id in new[] { "L1", "L2", "L3" }) facts.AddFact(new OnLineFact("O", id), "初始");
+
+        new TheoremEngine().Register<ConcurrentFromCommonPointRule>().RunToFixedPoint(facts);
+
+        var d = facts.DerivationLog.Single(x => x.RuleId == RuleIds.ConcurrentFromCommonPoint);
+        Assert.Null(d.Note);
+        Assert.Contains("共点", ProofNarrator.Render(facts, d));
+    }
+
+    // ---------- 完全四点形 ----------
+    [Fact]
+    public void Quadrangle_RendersHarmonicProperty()
+    {
+        var facts = Scenes.QuadrangleScene();
+        new TheoremEngine().Register<CompleteQuadrangleHarmonicRule>().RunToFixedPoint(facts);
+
+        var d = facts.DerivationLog.First(x => x.RuleId == RuleIds.CompleteQuadrangleHarmonic);
+        Assert.Null(d.Note);
+        Assert.Contains("调和", ProofNarrator.Render(facts, d));
+    }
+
+    // ---------- Brianchon ----------
+    [Fact]
+    public void Brianchon_RendersExscribedHexagon()
+    {
+        var facts = new FactBase { CurrentLevel = TransformLevel.Projective };
+        facts.AddConic("C", Scenes.UnitCircle);
+        int i = 1;
+        foreach (var (touchId, touch, line) in Scenes.SixTangents)
+        {
+            facts.AddPoint(touchId, touch);
+            facts.AddLine("T" + i, line);
+            facts.AddFact(new TangentFact("T" + i, "C", touchId), "初始");
+            i++;
+        }
+
+        new TheoremEngine().Register<BrianchonRule>().RunToFixedPoint(facts);
+
+        var d = facts.DerivationLog.Single(x => x.RuleId == RuleIds.Brianchon);
+        Assert.Null(d.Note);
+        Assert.Equal(6, d.Premises.OfType<TangentFact>().Count());
+        Assert.Contains("Brianchon", ProofNarrator.Render(facts, d));
     }
 
     // ---------- 初始事实的出处 ----------

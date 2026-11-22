@@ -191,7 +191,7 @@ public readonly struct ChordOfContactIsPolarRule : IFactRule<ChordOfContactIsPol
                         polarQ.ContainsStrictly(ptB) != StrictResult.StrictlyTrue) continue;
 
                     string chordId = facts.GetOrCreateLine(t1.TouchPointId, t2.TouchPointId);
-                    if (facts.AddFact(
+                    if (facts.AddDerivedFact(
                             new PolarOfFact(chordId, qId, t1.ConicId),
                             RuleIds.ChordOfContactIsPolar,
                             t1, t2,
@@ -254,7 +254,7 @@ public readonly struct PolePolarReciprocityRule : IFactRule<PolePolarReciprocity
                 var ptP = facts.Points[pFact.PoleId];
                 if (lineQ.ContainsStrictly(ptP) != StrictResult.StrictlyTrue) continue;
 
-                if (facts.AddFact(
+                if (facts.AddDerivedFact(
                         new OnLineFact(pFact.PoleId, qFact.LineId),
                         RuleIds.PolePolarReciprocity,
                         pFact, qFact,
@@ -319,8 +319,15 @@ public readonly struct HarmonicPolarBundleRule : IFactRule<HarmonicPolarBundleRu
 
                         if (res != StrictResult.StrictlyTrue) continue;
 
-                        if (facts.AddFact(new HarmonicFact(polar.PoleId, rId, mId, nId),
-                            $"[{Title}] 割线 {secId} 交极线 {polar.LineId} 于 {rId}、交曲线于 {mId},{nId} => 严格构成调和点列 ({polar.PoleId}, {rId}; {mId}, {nId}) = -1"))
+                        if (facts.AddDerivedFact(
+                                new HarmonicFact(polar.PoleId, rId, mId, nId),
+                                RuleIds.HarmonicPolarBundle,
+                                polar,
+                                new OnLineFact(polar.PoleId, secId),
+                                new OnLineFact(rId, secId),
+                                new OnLineFact(rId, polar.LineId),
+                                new OnConicFact(mId, polar.ConicId),
+                                new OnConicFact(nId, polar.ConicId)))
                             count++;
                     }
                 }
@@ -404,8 +411,12 @@ public readonly struct ConicMidpointSlopeRule : IFactRule<ConicMidpointSlopeRule
 
                 if (conj.VerifyStrictZero() != StrictResult.StrictlyTrue) continue;
 
-                if (facts.AddFact(new ConjugateDirectionsFact(lineOM, lineAB, cen.ConicId),
-                    $"[{Title}] {mid.MidId} 为弦 {mid.AId}{mid.BId} 中点 => 弦方向与 O{mid.MidId} 关于二次部分共轭"))
+                if (facts.AddDerivedFact(
+                        new ConjugateDirectionsFact(lineOM, lineAB, cen.ConicId),
+                        RuleIds.ConicMidpointSlope,
+                        cen, mid,
+                        new OnConicFact(mid.AId, cen.ConicId),
+                        new OnConicFact(mid.BId, cen.ConicId)))
                     count++;
 
                 // 特例：无交叉项且斜率有限时，额外给出斜率积定值 −M₀₀/M₁₁
@@ -418,8 +429,12 @@ public readonly struct ConicMidpointSlopeRule : IFactRule<ConicMidpointSlopeRule
                 var expected = (-m.M00 / m.M11).Simplified();
                 if ((k1.Value * k2.Value - expected).VerifyStrictZero() != StrictResult.StrictlyTrue) continue;
 
-                if (facts.AddFact(new ConstantSlopeProductFact(lineOM, lineAB, expected),
-                    $"[{Title}] {mid.MidId} 为弦 {mid.AId}{mid.BId} 中点 => 斜率之积 k({lineOM}) * k({lineAB}) = {expected}"))
+                if (facts.AddDerivedFact(
+                        new ConstantSlopeProductFact(lineOM, lineAB, expected),
+                        RuleIds.ConicMidpointSlope,
+                        cen, mid,
+                        new OnConicFact(mid.AId, cen.ConicId),
+                        new OnConicFact(mid.BId, cen.ConicId)))
                     count++;
             }
         }
@@ -460,8 +475,11 @@ public readonly struct PolarFundamentalRule : IFactRule<PolarFundamentalRule>
             if (conic.ContainsStrictly(pole) != StrictResult.StrictlyTrue) continue;
             if (ConicTools.IsPolarLine(conic, pole, facts.Lines[polar.LineId]) != StrictResult.StrictlyTrue) continue;
 
-            if (facts.AddFact(new TangentFact(polar.LineId, polar.ConicId, polar.PoleId),
-                $"[{Title}] {polar.PoleId} 在曲线 {polar.ConicId} 上且 {polar.LineId} 是其极线 => {polar.LineId} 切曲线于 {polar.PoleId}"))
+            if (facts.AddDerivedFact(
+                    new TangentFact(polar.LineId, polar.ConicId, polar.PoleId),
+                    RuleIds.PolarFundamental,
+                    polar,
+                    new OnConicFact(polar.PoleId, polar.ConicId)))
                 count++;
         }
 
@@ -526,8 +544,14 @@ public readonly struct ConjugateDiameterBisectsChordRule : IFactRule<ConjugateDi
             if (conic.ContainsStrictly(ptA) != StrictResult.StrictlyTrue) continue;
             if (conic.ContainsStrictly(ptB) != StrictResult.StrictlyTrue) continue;
 
-            if (facts.AddFact(new MidpointFact(midId, onChord[0], onChord[1]),
-                $"[{Title}] 弦 {conj.Line2Id} 与直径 {conj.Line1Id} 共轭 => 交点 {midId} 是弦 {onChord[0]}{onChord[1]} 的中点"))
+            if (facts.AddDerivedFact(
+                    new MidpointFact(midId, onChord[0], onChord[1]),
+                    RuleIds.ConjugateDiameterBisectsChord,
+                    conj,
+                    new OnLineFact(onChord[0], conj.Line2Id),
+                    new OnLineFact(onChord[1], conj.Line2Id),
+                    new OnConicFact(onChord[0], conj.ConicId),
+                    new OnConicFact(onChord[1], conj.ConicId)))
                 count++;
         }
 
@@ -613,7 +637,7 @@ public readonly struct PascalRule : IFactRule<PascalRule>
                 string qId = EnsurePoint(facts, $"AUX:PASCAL[{a2}{a3}|{a5}{a6}]", q);
                 string rId = EnsurePoint(facts, $"AUX:PASCAL[{a3}{a4}|{a6}{a1}]", r);
 
-                if (facts.AddFact(
+                if (facts.AddDerivedFact(
                         CollinearFact.Create(pId, qId, rId),
                         RuleIds.Pascal,
                         new OnConicFact(a1, conicId), new OnConicFact(a2, conicId),
@@ -732,8 +756,9 @@ public readonly struct CompleteQuadrangleHarmonicRule : IFactRule<CompleteQuadra
                 if (GeometryAudit.IsHarmonic(s.X, s.Y, s.G, S) != StrictResult.StrictlyTrue) continue;
 
                 string sId = EnsurePoint(facts, $"AUX:CQ[{aId}{bId}{cId}{dId}][{s.XId}{s.YId}]", S);
-                if (facts.AddFact(new HarmonicFact(s.XId, s.YId, s.GId, sId),
-                    $"[{Title}] 四点形 {aId}{bId}{cId}{dId}：边 {s.XId}{s.YId} 上 ({s.XId},{s.YId};{s.GId},{sId}) = -1"))
+                if (facts.AddDerivedFact(
+                        new HarmonicFact(s.XId, s.YId, s.GId, sId),
+                        RuleIds.CompleteQuadrangleHarmonic))
                     count++;
             }
         }
@@ -833,6 +858,7 @@ public readonly struct BrianchonRule : IFactRule<BrianchonRule>
 
             // 严通道回验 + 线互异
             var lines = new List<string>();
+            var lineFacts = new List<TangentFact>();
             var seen = new List<HLine>();
             foreach (var t in group)
             {
@@ -842,6 +868,7 @@ public readonly struct BrianchonRule : IFactRule<BrianchonRule>
                 if (seen.Any(prev => LineTools.Same(prev, line) == StrictResult.StrictlyTrue)) continue;
                 seen.Add(line);
                 lines.Add(t.LineId);
+                lineFacts.Add(t);
             }
             if (lines.Count < 6) continue;
 
@@ -885,8 +912,11 @@ public readonly struct BrianchonRule : IFactRule<BrianchonRule>
                 string d2Id = EnsureLine(facts, $"AUX:BRI[{tag}][2-5]", d2);
                 string d3Id = EnsureLine(facts, $"AUX:BRI[{tag}][3-6]", d3);
 
-                if (facts.AddFact(ConcurrentFact.Create(d1Id, d2Id, d3Id),
-                    $"[{Title}] 外切六边形 {string.Join(",", t)} 于 {group.Key}：主对角线 {d1Id},{d2Id},{d3Id} 共点"))
+                if (facts.AddDerivedFact(
+                        ConcurrentFact.Create(d1Id, d2Id, d3Id),
+                        RuleIds.Brianchon,
+                        lineFacts[i], lineFacts[j], lineFacts[k],
+                        lineFacts[l], lineFacts[m], lineFacts[n]))
                     count++;
             }
         }
@@ -943,7 +973,7 @@ public readonly struct CollinearFromCommonLineRule : IFactRule<CollinearFromComm
                 // 严通道回验：坐标确实共线
                 if (PointTools.Collinear(a, b, c) != StrictResult.StrictlyTrue) continue;
 
-                if (facts.AddFact(
+                if (facts.AddDerivedFact(
                         CollinearFact.Create(pts[i], pts[j], pts[k]),
                         RuleIds.CollinearFromCommonLine,
                         new OnLineFact(pts[i], lineId),
@@ -1002,8 +1032,12 @@ public readonly struct ConcurrentFromCommonPointRule : IFactRule<ConcurrentFromC
                 if (l2.ContainsStrictly(p) != StrictResult.StrictlyTrue) continue;
                 if (l3.ContainsStrictly(p) != StrictResult.StrictlyTrue) continue;
 
-                if (facts.AddFact(ConcurrentFact.Create(lines[i], lines[j], lines[k]),
-                    $"[{Title}] {lines[i]}, {lines[j]}, {lines[k]} 同过点 {pointId} => 三线共点"))
+                if (facts.AddDerivedFact(
+                        ConcurrentFact.Create(lines[i], lines[j], lines[k]),
+                        RuleIds.ConcurrentFromCommonPoint,
+                        new OnLineFact(pointId, lines[i]),
+                        new OnLineFact(pointId, lines[j]),
+                        new OnLineFact(pointId, lines[k])))
                     count++;
             }
         }

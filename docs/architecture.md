@@ -64,8 +64,10 @@
 - **解释文本集中在 `ProofNarrator`**：按 `RuleIds.*` 模板渲染。改文案、换语言、
   出 LaTeX 都只改这一个文件。
 - `RuleIds` 常量表是规则与解释层的稳定键，避免两边各写魔法字符串而漂移。
-- 迁移状态：切点弦极线、La Hire、同线三点共线、Pascal 四条已迁移；
-  其余规则暂以 `RuleIds.AdHoc` + `Note` 记录，渲染时回退到 Note。
+- 写入 API 分离：初始条件/辅助连线用 `AddFact(fact, note)`；规则导出用
+  `AddDerivedFact(fact, ruleId, params premises)`。**刻意不共用同一个名字**——
+  零前提时 params 重载会与 note 重载产生歧义，导致规则记录被误当成初始条件。
+- 迁移状态：11 条规则**全部迁移**（规则代码中不再出现自然语言）。
 
 ## 5. 事实模型
 
