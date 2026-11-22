@@ -132,17 +132,6 @@ public readonly struct PolePolarReciprocityRule : IFactRule<PolePolarReciprocity
     public static string Title => "La Hire 极点极线互反定理";
     public static TransformLevel RequiredLevel => TransformLevel.Projective;
 
-    /// <summary>严通道判断两条齐次直线是否重合：叉积分量全部严格为零（齐次向量成比例）。</summary>
-    private static bool SameLineStrictly(HLine a, HLine b)
-    {
-        var cx = a.B * b.C - a.C * b.B;
-        var cy = a.C * b.A - a.A * b.C;
-        var cz = a.A * b.B - a.B * b.A;
-        return cx.VerifyStrictZero() == StrictResult.StrictlyTrue
-            && cy.VerifyStrictZero() == StrictResult.StrictlyTrue
-            && cz.VerifyStrictZero() == StrictResult.StrictlyTrue;
-    }
-
     public static int Apply(FactBase facts)
     {
         int count = 0;
@@ -161,10 +150,12 @@ public readonly struct PolePolarReciprocityRule : IFactRule<PolePolarReciprocity
                 if (!facts.Facts.Contains(new OnLineFact(qFact.PoleId, pFact.LineId))) continue;
 
                 // 前提严通道回验：确认两条线确实分别是两极点的极线（不信任 PolarOfFact 标签）。
-                // 线与线重合的判据：叉积分量全为 0（齐次向量成比例）。
+                // 判据收敛在 ConicTools.IsPolarLine（与裁决器共用，避免两处实现漂移）。
                 var conic = facts.Conics[pFact.ConicId];
-                if (!SameLineStrictly(conic.PolarLine(facts.Points[pFact.PoleId]), facts.Lines[pFact.LineId])) continue;
-                if (!SameLineStrictly(conic.PolarLine(facts.Points[qFact.PoleId]), facts.Lines[qFact.LineId])) continue;
+                if (ConicTools.IsPolarLine(conic, facts.Points[pFact.PoleId], facts.Lines[pFact.LineId])
+                    != StrictResult.StrictlyTrue) continue;
+                if (ConicTools.IsPolarLine(conic, facts.Points[qFact.PoleId], facts.Lines[qFact.LineId])
+                    != StrictResult.StrictlyTrue) continue;
 
                 // 严通道验真：L_Q 真的严格经过 P
                 var lineQ = facts.Lines[qFact.LineId];

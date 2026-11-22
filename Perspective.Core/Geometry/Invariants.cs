@@ -91,8 +91,8 @@ public static class GeometryAudit
     public static StrictResult IsHarmonic(HPoint a, HPoint b, HPoint c, HPoint d)
     {
         // 四点必须互异：重合时交比无定义，不能断言 -1
-        if (SamePoint(a, b) || SamePoint(a, c) || SamePoint(a, d) ||
-            SamePoint(b, c) || SamePoint(b, d) || SamePoint(c, d))
+        if (PointTools.Same(a, b) || PointTools.Same(a, c) || PointTools.Same(a, d) ||
+            PointTools.Same(b, c) || PointTools.Same(b, d) || PointTools.Same(c, d))
             return StrictResult.StrictlyFalse;
 
         var line = HLine.FromPoints(a, b);
@@ -115,14 +115,5 @@ public static class GeometryAudit
             return StrictResult.NoSymbolicData;
 
         return (num + den).VerifyStrictZero(); // num / den == -1 等价于 num + den == 0
-    }
-
-    /// <summary>两个齐次点是否代表同一个射影点（叉积分量全为 0）</summary>
-    private static bool SamePoint(HPoint p, HPoint q)
-    {
-        var cx = p.Y * q.W - p.W * q.Y;
-        var cy = p.W * q.X - p.X * q.W;
-        var cw = p.X * q.Y - p.Y * q.X;
-        return cx.IsNumericallyZero() && cy.IsNumericallyZero() && cw.IsNumericallyZero();
     }
 }
