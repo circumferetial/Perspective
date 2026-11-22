@@ -1,0 +1,8 @@
+Perspective
+Copyright 2026 VanishingPoint and contributors
+
+This product includes software developed by third parties:
+- AngouriMath (MIT)
+- Microsoft.Z3 (MIT)
+- SymPy (BSD) - optional backend
+See the respective package licenses for details.

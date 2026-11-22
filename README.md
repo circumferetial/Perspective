@@ -64,5 +64,5 @@ dotnet test  Perspective.Sympy.Tests           # SymPy 子进程（需 python + 
 
 ## 致谢
 
-开发过程中使用了 AngouriMath、Z3、SymPy 等开源项目；本项目的人类作者主导设计，
+作者：VanishingPoint。开发过程中使用了 AngouriMath、Z3、SymPy 等开源项目；
 AI 工具参与了讨论、实现与测试。
