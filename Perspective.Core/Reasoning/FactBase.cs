@@ -519,6 +519,23 @@ public sealed class FactBase
     }
 
     /// <summary>
+    /// 登记/复用一般点（含由构造产生的辅助点）：按 SameStrictly 严格去重。
+    /// 与 <see cref="GetOrCreatePointAtInfinity"/> 分开：这里允许任何有限点。
+    /// </summary>
+    public string GetOrCreatePoint(HPoint candidate)
+    {
+        foreach (var (id, existing) in Points)
+            if (PointTools.SameStrictly(existing, candidate) == StrictResult.StrictlyTrue)
+                return id;
+
+        string newId;
+        var k = 0;
+        do { newId = $"P{k++}"; } while (Points.ContainsKey(newId));
+        Points[newId] = candidate;
+        return newId;
+    }
+
+    /// <summary>
     /// 惰性登记无穷远线 $l_\infty$（仿射结构的载体）。只在确实需要仿射结构时调用，
     /// 不作为全局假设——否则所有场景都会被强制成仿射视角。
     /// </summary>

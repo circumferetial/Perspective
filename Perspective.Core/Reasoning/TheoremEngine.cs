@@ -1460,3 +1460,136 @@ public readonly struct ParallelImpliesSharedInfinityPointRule : IFactRule<Parall
         return count;
     }
 }
+/// <summary>
+/// P3a 中点桥：调和共轭于无穷远点 ⇒ 中点。
+/// 【前提】HarmonicFact(A,B;M,D∞)，其中 D∞ 是唯一的无穷远点，A≠B（坐标互异需被证明）。
+/// 【结论】MidpointFact(M,A,B)。
+/// 【推导】仿射直线上，中点 M 与无穷远点 D∞ 关于 A、B 调和共轭：(A,B;M,D∞) = −1。
+/// 【守卫】① 恰有一个无穷远点；② A、B 坐标严格互异（SameStrictly 必须为 StrictlyFalse）；
+///         ③ 调和严格回验；④ IsMidpoint 交叉验证失败则不写（两套定义必须一致）。
+/// 【等级】Affine——中点依赖 l∞ 仿射结构。
+/// </summary>
+public readonly struct MidpointFromHarmonicInfinityRule : IFactRule<MidpointFromHarmonicInfinityRule>
+{
+    public static string Title => "调和共轭于无穷远点 ⇒ 中点";
+    public static TransformLevel RequiredLevel => TransformLevel.Affine;
+    public static Type[] ConclusionTypes => [typeof(MidpointFact)];
+    public static Type[] PremiseTypes => [typeof(HarmonicFact)];
+
+    public static int Apply(FactBase facts)
+    {
+        int count = 0;
+        foreach (var harmonic in facts.Harmonics.ToList())
+        {
+            var ids = new[] { harmonic.AId, harmonic.BId, harmonic.CId, harmonic.DId };
+            if (ids.Any(id => !facts.Points.ContainsKey(id))) continue;
+
+            var infinityIds = ids.Where(id => facts.Points[id].IsAtInfinity).ToList();
+            if (infinityIds.Count != 1) continue;
+            var infinityId = infinityIds[0];
+            var infinity = facts.Points[infinityId];
+
+            var finiteIds = ids.Where(id => id != infinityId).ToList();
+            foreach (var midId in finiteIds)
+            {
+                var endpointIds = finiteIds.Where(id => id != midId).ToList();
+                if (endpointIds.Count != 2) continue;
+
+                var pA = facts.Points[endpointIds[0]];
+                var pB = facts.Points[endpointIds[1]];
+                var pM = facts.Points[midId];
+
+                // A ≠ B 必须被证明（重合时中点无定义；IsHarmonic 也会因不互异而拒绝）
+                if (PointTools.SameStrictly(pA, pB) != StrictResult.StrictlyFalse) continue;
+
+                if (GeometryAudit.IsHarmonic(pA, pB, pM, infinity) != StrictResult.StrictlyTrue) continue;
+                if (GeometryAudit.IsMidpoint(pM, pA, pB) != StrictResult.StrictlyTrue) continue;   // 交叉验证
+
+                var (aId, bId) = string.CompareOrdinal(endpointIds[0], endpointIds[1]) <= 0
+                    ? (endpointIds[0], endpointIds[1])
+                    : (endpointIds[1], endpointIds[0]);
+
+                if (facts.AddDerivedFact(new MidpointFact(midId, aId, bId),
+                        RuleIds.MidpointFromHarmonicInfinity, harmonic))
+                    count++;
+            }
+        }
+        return count;
+    }
+}
+/// <summary>
+/// P3b：圆锥曲线弦的"方向点极线"给出调和共轭（#4 共轭部分与 #6 的射影化基础）。
+/// 【前提】非退化圆锥曲线 C；弦 AB（A、B 是已登记在 C 与直线 L 上的点）；
+///         D∞ = L ∩ l∞ 是弦方向的无穷远点；M = (C·D∞) ∩ L。
+/// 【结论】HarmonicFact(A, B; M, D∞)。
+/// 【推导】配极定理：过 P 的割线交 C 于 A、B，则 P 的极线与 AB 的交点是 P 关于 A、B 的调和共轭。
+///         取 P = D∞（弦方向的无穷远点），其极线即"共轭直径"，M 与 D∞ 调和共轭 ⇒ 再由中点桥得中点。
+/// 【覆盖】椭圆/双曲/抛物线统一（不需要中心）；抛物线时极线是直径 y=2a/m。
+/// 【守卫】det(C)≠0；极线非零；D∞ 在无穷远；M 有限；调和严通道回验。
+/// 【等级】Affine（依赖 l∞）。
+/// </summary>
+public readonly struct ConicChordPolarHarmonicRule : IFactRule<ConicChordPolarHarmonicRule>
+{
+    public static string Title => "弦方向点极线 ⇒ 调和共轭";
+    public static TransformLevel RequiredLevel => TransformLevel.Affine;
+    public static Type[] ConclusionTypes => [typeof(HarmonicFact)];
+    public static Type[] PremiseTypes => [typeof(OnConicFact), typeof(OnLineFact)];
+
+    public static int Apply(FactBase facts)
+    {
+        int count = 0;
+        foreach (var (conicId, conic) in facts.Conics)
+        {
+            // 非退化是"正常配极"的前提
+            if (conic.Matrix.Determinant().VerifyStrictZero() != StrictResult.StrictlyFalse)
+                continue;
+
+            foreach (var lineId in facts.LineIdsWithPoints.ToList())
+            {
+                if (!facts.Lines.TryGetValue(lineId, out var chord)) continue;
+
+                var onChord = facts.PointsOn(lineId)
+                    .Where(pid => facts.HasOnConic(pid, conicId))
+                    .Distinct()
+                    .ToList();
+                if (onChord.Count != 2) continue;
+
+                var infinityLineId = facts.GetOrCreateInfinityLine();
+                var direction = HLine.Intersect(chord, facts.Lines[infinityLineId]);
+                if (!direction.IsAtInfinity) continue;
+
+                var directionId = facts.GetOrCreatePointAtInfinity(direction);
+
+                var polar = conic.PolarLine(direction);
+                var zero = (polar.A.VerifyStrictZero() == StrictResult.StrictlyTrue)
+                        && (polar.B.VerifyStrictZero() == StrictResult.StrictlyTrue)
+                        && (polar.C.VerifyStrictZero() == StrictResult.StrictlyTrue);
+                if (zero) continue;
+
+                var mid = HLine.Intersect(polar, chord);
+                if (mid.IsAtInfinity) continue;
+
+                var midId = facts.GetOrCreatePoint(mid);
+
+                var (aId, bId) = string.CompareOrdinal(onChord[0], onChord[1]) <= 0
+                    ? (onChord[0], onChord[1])
+                    : (onChord[1], onChord[0]);
+
+                if (GeometryAudit.IsHarmonic(
+                        facts.Points[aId], facts.Points[bId],
+                        facts.Points[midId], facts.Points[directionId]) != StrictResult.StrictlyTrue)
+                    continue;
+
+                if (facts.AddDerivedFact(
+                        new HarmonicFact(aId, bId, midId, directionId),
+                        RuleIds.ConicChordPolarHarmonic,
+                        new OnConicFact(aId, conicId),
+                        new OnConicFact(bId, conicId),
+                        new OnLineFact(aId, lineId),
+                        new OnLineFact(bId, lineId)))
+                    count++;
+            }
+        }
+        return count;
+    }
+}
