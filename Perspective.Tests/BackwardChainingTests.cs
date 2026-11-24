@@ -13,7 +13,6 @@ public class BackwardChainingTests
         .Register<HarmonicPolarBundleRule>()
         .Register<ConicMidpointSlopeRule>()
         .Register<PolarFundamentalRule>()
-        .Register<ConjugateDiameterBisectsChordRule>()
         .Register<CollinearFromCommonLineRule>()
         .Register<ConcurrentFromCommonPointRule>()
         .Register<PascalRule>()

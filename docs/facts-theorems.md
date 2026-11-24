@@ -50,7 +50,7 @@
 | 3 | 极点极线调和束 | 极线、割线、割线与极线交点、两曲线交点 | `HarmonicFact` | Projective | 严格回验交比 |
 | 4 | 点差法中点斜率积 | 中心、中点、两点在曲线上 | `ConjugateDirectionsFact`（共轭，可搬运）/ `ConstantSlopeProductFact`（轴对齐坐标系显示性推论，**非**仿射不变量） | Affine（共轭）/ 固定轴向特例（斜率积） | 射影不保中点；斜率积仅在 M₀₁=0 的坐标系内成立，不做变换搬运 |
 | 5 | 极线基本定理 | 点在曲线上 + 其极线 | `TangentFact` | Projective | 曲线上点的极线即切线 |
-| 6 | 共轭直径平分弦 | 共轭方向、弦的两端在曲线上 | `MidpointFact` | Affine | |
+| 6 | ~~共轭直径平分弦~~ | — | `MidpointFact` | Affine | **已退役（P3 管线替代）**：弦中点改由 `ConicChordPolarHarmonicRule` + `MidpointFromHarmonicInfinityRule` 推导（中心自由、覆盖抛物线） |
 | 7 | 同线三点共线 | 三点在同一直线上 | `CollinearFact` | Projective | 平凡但补链 |
 | 8 | 同点三线共点 | 三线过同一点 | `ConcurrentFact` | Projective | 平凡但补链 |
 | 9 | Pascal | 六点内接同一非退化曲线 | `CollinearFact`（对边交点） | Projective | 组合型，有成本闸 |
