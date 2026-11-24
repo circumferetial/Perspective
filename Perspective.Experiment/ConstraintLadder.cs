@@ -4,12 +4,12 @@ using Perspective.Core.Math;
 namespace Perspective.Experiment;
 
 /// <summary>
-/// 实验：从"最一般的对象"出发，逐条加条件（线性约束），观察对象如何被约束成
-/// 更小的线性系，直到唯一。
-/// <para>
-/// 直线：3 维系数空间（齐次意义下 2 维）；条件 l·P = 0 是线性方程。
-/// 无约束 → 2 维（整个平面直线）；1 个点 → 1 维（过该点的线束）；2 个点 → 0 维（唯一）。
-/// </para>
+///     实验：从"最一般的对象"出发，逐条加条件（线性约束），观察对象如何被约束成
+///     更小的线性系，直到唯一。
+///     <para>
+///         直线：3 维系数空间（齐次意义下 2 维）；条件 l·P = 0 是线性方程。
+///         无约束 → 2 维（整个平面直线）；1 个点 → 1 维（过该点的线束）；2 个点 → 0 维（唯一）。
+///     </para>
 /// </summary>
 public static class ConstraintLadder
 {
@@ -22,19 +22,19 @@ public static class ConstraintLadder
             Vec3.Point(ExactScalar.FromInt(1), ExactScalar.FromInt(1))
         };
 
-        for (int k = 0; k <= points.Length; k++)
+        for (var k = 0; k <= points.Length; k++)
         {
             var rows = points.Take(k)
                 .Select(p => new[] { p.X, p.Y, p.Z })
                 .ToList();
             var nullity = LinearAlgebra.NullspaceDimension(rows, 3);
-            string meaning = k switch
+            var meaning = k switch
             {
                 0 => "所有直线（射影 2 维）",
                 1 => "过一点的直线束（1 维 = 线系）",
                 _ => nullity == 1 ? "唯一一条直线（0 维）" : "条件矛盾（无直线）"
             };
-            string dims = nullity > 0
+            var dims = nullity > 0
                 ? $"线性维数 {nullity}（射影维数 {nullity - 1}）"
                 : "线性维数 0（无解）";
             Console.WriteLine($"  加 {k} 个「点在线上」约束 → {dims}：{meaning}");
@@ -48,9 +48,9 @@ public static class ConstraintLadder
 
         // C1：单位圆；C2：线对 (x+y−1)(x+y+1)=0，均过上面四点
         var c1 = Conic.Circle(0, 0, ExactScalar.FromInt(1));
-        var l1 = new HLine(1, 1, -1);   // x + y − 1 = 0
-        var l2 = new HLine(1, 1, 1);    // x + y + 1 = 0
-        var c2 = LinePair(l1, l2);
+        var l1 = new HLine(1, 1, -1);// x + y − 1 = 0
+        var l2 = new HLine(1, 1, 1);// x + y + 1 = 0
+        var c2 = ExperimentMath.LinePair(l1, l2);
 
         Console.WriteLine("  过 4 点 ⇒ 1 维线性系（曲线系）C(λ) = C1 + λ·C2");
         var lambdas = new[] { ExactScalar.FromInt(0), ExactScalar.FromInt(1), ExactScalar.FromInt(-1) };
@@ -95,22 +95,8 @@ public static class ConstraintLadder
         Console.WriteLine("  （λ 的取值就是「约束如何选出一条具体曲线」的演化结果）");
     }
 
-    private static Conic LinePair(HLine a, HLine b)
-    {
-        // C = l1·l2ᵀ + l2·l1ᵀ（对称），对应退化二次型 (l1)(l2)=0
-        var av = new[] { a.A, a.B, a.C };
-        var bv = new[] { b.A, b.B, b.C };
-        var m = new ExactScalar[3, 3];
-        for (int i = 0; i < 3; i++)
-        for (int j = 0; j < 3; j++)
-            m[i, j] = av[i] * bv[j] + bv[i] * av[j];
-        return new Conic(new Matrix3x3(m[0, 0], m[0, 1], m[0, 2],
-                                       m[1, 0], m[1, 1], m[1, 2],
-                                       m[2, 0], m[2, 1], m[2, 2]));
-    }
-
     private static Conic Pencil(Conic c1, Conic c2, ExactScalar lambda) =>
-        new Conic(new Matrix3x3(
+        new(new Matrix3x3(
             c1.Matrix.M00 + lambda * c2.Matrix.M00, c1.Matrix.M01 + lambda * c2.Matrix.M01,
             c1.Matrix.M02 + lambda * c2.Matrix.M02,
             c1.Matrix.M10 + lambda * c2.Matrix.M10, c1.Matrix.M11 + lambda * c2.Matrix.M11,
@@ -130,11 +116,11 @@ public static class LinearAlgebra
     public static int NullspaceDimension(IReadOnlyList<ExactScalar[]> rows, int columns)
     {
         var matrix = rows.Select(r => r.ToArray()).ToList();
-        int rank = 0;
-        for (int col = 0; col < columns && rank < matrix.Count; col++)
+        var rank = 0;
+        for (var col = 0; col < columns && rank < matrix.Count; col++)
         {
-            int pivot = -1;
-            for (int row = rank; row < matrix.Count; row++)
+            var pivot = -1;
+            for (var row = rank; row < matrix.Count; row++)
                 if (matrix[row][col].VerifyStrictZero() != StrictResult.StrictlyTrue)
                 {
                     pivot = row;
@@ -144,15 +130,15 @@ public static class LinearAlgebra
 
             (matrix[rank], matrix[pivot]) = (matrix[pivot], matrix[rank]);
             var pv = matrix[rank][col];
-            for (int j = col; j < columns; j++)
+            for (var j = col; j < columns; j++)
                 matrix[rank][j] = matrix[rank][j] / pv;
 
-            for (int row = 0; row < matrix.Count; row++)
+            for (var row = 0; row < matrix.Count; row++)
             {
                 if (row == rank) continue;
                 var factor = matrix[row][col];
                 if (factor.VerifyStrictZero() == StrictResult.StrictlyTrue) continue;
-                for (int j = col; j < columns; j++)
+                for (var j = col; j < columns; j++)
                     matrix[row][j] = matrix[row][j] - factor * matrix[rank][j];
             }
             rank++;

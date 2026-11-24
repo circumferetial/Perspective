@@ -8,12 +8,16 @@ public readonly record struct Vec4(ExactScalar X, ExactScalar Y, ExactScalar Z, 
 
 /// <summary>直线的 Plücker 坐标（六个 2×2 小行列式）。</summary>
 public readonly record struct Plucker6(
-    ExactScalar P01, ExactScalar P02, ExactScalar P03,
-    ExactScalar P12, ExactScalar P13, ExactScalar P23);
+    ExactScalar P01,
+    ExactScalar P02,
+    ExactScalar P03,
+    ExactScalar P12,
+    ExactScalar P13,
+    ExactScalar P23);
 
 /// <summary>
-/// 三维射影几何的"本质描述"：点=1维子空间（4向量）、线=2维子空间（Plücker 6 元组）、
-/// 平面=3维子空间（对偶 4 向量）。同一楔积既做 join 又判关联（为零即"点在线上"）。
+///     三维射影几何的"本质描述"：点=1维子空间（4向量）、线=2维子空间（Plücker 6 元组）、
+///     平面=3维子空间（对偶 4 向量）。同一楔积既做 join 又判关联（为零即"点在线上"）。
 /// </summary>
 public static class GrassmannExperiment
 {
@@ -21,9 +25,12 @@ public static class GrassmannExperiment
     {
         Console.WriteLine("\n=== 三维子空间：点/线/平面的统一楔积 ===");
 
-        var a = new Vec4(ExactScalar.FromInt(1), ExactScalar.FromInt(0), ExactScalar.FromInt(0), ExactScalar.FromInt(1));
-        var b = new Vec4(ExactScalar.FromInt(0), ExactScalar.FromInt(1), ExactScalar.FromInt(0), ExactScalar.FromInt(1));
-        var c = new Vec4(ExactScalar.FromInt(0), ExactScalar.FromInt(0), ExactScalar.FromInt(1), ExactScalar.FromInt(1));
+        var a = new Vec4(ExactScalar.FromInt(1), ExactScalar.FromInt(0), ExactScalar.FromInt(0),
+            ExactScalar.FromInt(1));
+        var b = new Vec4(ExactScalar.FromInt(0), ExactScalar.FromInt(1), ExactScalar.FromInt(0),
+            ExactScalar.FromInt(1));
+        var c = new Vec4(ExactScalar.FromInt(0), ExactScalar.FromInt(0), ExactScalar.FromInt(1),
+            ExactScalar.FromInt(1));
 
         // 线 = 两点楔积（Plücker 坐标）
         var line = Join(a, b);
@@ -48,13 +55,15 @@ public static class GrassmannExperiment
         // 关联：点 c 在线上 ⇔ 楔积 p∧a∧b = 0（四分量全零）
         var onLine = Wedge3(c, a, b);
         Console.WriteLine($"  c 是否在 a,b 的线上？{IsZero(onLine)}（楔积 {Fmt(onLine)}）");
-        var d = new Vec4(ExactScalar.FromFormula("1/2"), ExactScalar.FromFormula("1/2"), ExactScalar.FromInt(0), ExactScalar.FromInt(1));
+        var d = new Vec4(ExactScalar.FromFormula("1/2"), ExactScalar.FromFormula("1/2"), ExactScalar.FromInt(0),
+            ExactScalar.FromInt(1));
         Console.WriteLine($"  d=(1/2,1/2,0) 是否在线上？{IsZero(Wedge3(d, a, b))}");
 
         // 平面 = 三点楔积（对偶 4 向量）；点 p 在平面上 ⇔ 配对为 0
         var plane = Wedge3(a, b, c);
         Console.WriteLine($"  过 a,b,c 的平面 = ({plane.X}, {plane.Y}, {plane.Z}, {plane.W})");
-        Console.WriteLine($"  a 在平面上？{IsZeroScalar(Dot(plane, a))}；原点在平面上？{IsZeroScalar(Dot(plane, new Vec4(0, 0, 0, 1)))}");
+        Console.WriteLine(
+            $"  a 在平面上？{IsZeroScalar(Dot(plane, a))}；原点在平面上？{IsZeroScalar(Dot(plane, new Vec4(0, 0, 0, 1)))}");
         Console.WriteLine("  → 点、线、平面只是不同维数的子空间；join 和关联判定都是同一个楔积。");
 
         Console.WriteLine("\n=== Pascal = Plücker/线性依赖（直线上的三点共线 ⇒ 3×3 行列式为零）===");
@@ -140,7 +149,7 @@ public static class GrassmannExperiment
             2 * 7 - 3 * 6, 2 * 8 - 4 * 6, 3 * 8 - 4 * 7
         };
         var actual = new[] { l.P01, l.P02, l.P03, l.P12, l.P13, l.P23 };
-        for (int i = 0; i < 6; i++)
+        for (var i = 0; i < 6; i++)
         {
             var diff = actual[i] - ExactScalar.FromInt(expected[i]);
             if (diff.VerifyStrictZero() != StrictResult.StrictlyTrue)

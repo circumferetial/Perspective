@@ -4,8 +4,8 @@ using Perspective.Core.Math;
 namespace Perspective.Experiment;
 
 /// <summary>
-/// 实验：把点/线统一成"三维向量空间中的子空间"，交/并由同一个楔积完成。
-/// 这是射影对偶最朴素的实现：点 = 1 维子空间，线 = 对偶空间里的 1 维子空间。
+///     实验：把点/线统一成"三维向量空间中的子空间"，交/并由同一个楔积完成。
+///     这是射影对偶最朴素的实现：点 = 1 维子空间，线 = 对偶空间里的 1 维子空间。
 /// </summary>
 public readonly record struct Vec3(ExactScalar X, ExactScalar Y, ExactScalar Z)
 {
@@ -52,7 +52,7 @@ public static class Program
 
         // 交点：线 → 点（同一个楔积）
         var another = new Dual(new Vec3(ExactScalar.FromInt(1), -ExactScalar.FromInt(1),
-            ExactScalar.FromInt(0)));   // x − y = 0（与连线不同）
+            ExactScalar.FromInt(0)));// x − y = 0（与连线不同）
         var intersection = Incidence.Meet(chord, another);
         Console.WriteLine($"两线交点 = ({intersection.X}, {intersection.Y}, {intersection.Z})" +
                           "（平行时为无穷远点，W=0 自动出现）");
@@ -71,5 +71,8 @@ public static class Program
         ConstraintLadder.Run();
         StructureLadder.Run();
         GrassmannExperiment.Run();
+        DegeneratePencil.Run();
+        CayleyKlein.Run();
+        VeroneseBrianchon.Run();
     }
 }

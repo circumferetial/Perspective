@@ -4,11 +4,11 @@ using Perspective.Core.Math;
 namespace Perspective.Experiment;
 
 /// <summary>
-/// 实验：同一批点，在不同变换群下，哪些量被保留——"空间 = 底层集合 + 结构"的可计算版本。
-/// <para>
-/// 距离在相似变换下只缩放；同一直线上的线段比在仿射下保持；交比在射影下保持。
-/// 这对应 Erlangen 分层的 Isometry / Similarity / Affine / Projective。
-/// </para>
+///     实验：同一批点，在不同变换群下，哪些量被保留——"空间 = 底层集合 + 结构"的可计算版本。
+///     <para>
+///         距离在相似变换下只缩放；同一直线上的线段比在仿射下保持；交比在射影下保持。
+///         这对应 Erlangen 分层的 Isometry / Similarity / Affine / Projective。
+///     </para>
 /// </summary>
 public static class StructureLadder
 {
