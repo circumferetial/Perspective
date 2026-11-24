@@ -12,29 +12,36 @@ public enum StrictResult
     NearZeroUnproven, // 数值极接近 0，但含复杂超越/根式，符号引擎暂未能化简为 0
     NoSymbolicData    // 来源包含纯近似浮点数（如鼠标自由拖拽），无法做严格证明
 }
-// 可以放在 Perspective.Core.Math 命名空间下（与 ExactScalar 同文件）
-public interface IExactRing<T> where T : IExactRing<T>
+/// <summary>
+/// 精确算术域契约（**不是**严格代数意义上的环）：
+/// 只承诺 0/1、加/减/乘（含一元负号）与三态判零决策过程；
+/// 不承诺除法、序、以及 Approx 轨上的代数封闭性（Exact 可为空）。
+/// 用途：让"同一套几何/消元代码"跑在 ExactScalar、PolyExpr、复数等不同系数域上。
+/// </summary>
+public interface IExactArithmetic<T> where T : IExactArithmetic<T>
 {
     abstract static T Zero { get; }
     abstract static T One { get; }
-    abstract static T FromLong(long value);
+    abstract static T FromInt(long value);
     abstract static T operator +(T a, T b);
     abstract static T operator -(T a, T b);
     abstract static T operator -(T a);
     abstract static T operator *(T a, T b);
-    abstract static StrictResult VerifyZero(T a);
+
+    /// <summary>三态判零：真 / 假 / 未证（不得把未证当零）。</summary>
+    abstract static StrictResult DecideZero(T value);
 }
 /// <summary>
 /// 双轨数字：同时携带“double 近似值”和“AngouriMath 精确代数基因”。
 /// 注意：record struct 默认的 == 为表达式树结构相等，判数学相等请使用
 /// <see cref="AreStrictlyEqual"/> 或 <c>(a - b).VerifyStrictZero()</c>。
 /// </summary>
-public readonly record struct ExactScalar(double Approx, Entity? Exact) : IExactRing<ExactScalar>
+public readonly record struct ExactScalar(double Approx, Entity? Exact) : IExactArithmetic<ExactScalar>
 {
     public static ExactScalar Zero => FromInt(0);
     public static ExactScalar One => FromInt(1);
-    static ExactScalar IExactRing<ExactScalar>.FromLong(long value) => FromInt(value);
-    static StrictResult IExactRing<ExactScalar>.VerifyZero(ExactScalar a) => a.VerifyStrictZero();
+    static ExactScalar IExactArithmetic<ExactScalar>.FromInt(long value) => FromInt(value);
+    static StrictResult IExactArithmetic<ExactScalar>.DecideZero(ExactScalar a) => a.VerifyStrictZero();
     // --- 几种创建方式 ---
     /// <summary>从精确整数创建（自带精确基因）</summary>
     public static ExactScalar FromInt(long value) => new(value, value);
