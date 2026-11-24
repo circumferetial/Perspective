@@ -187,7 +187,7 @@ public static class ConstructionEngine
         ClaimLinePolarOf c
             when facts.Points.TryGetValue(c.PoleId, out var pole) &&
                  facts.Conics.TryGetValue(c.ConicId, out var conic) =>
-            (ConicTools.IsPolarLine(conic, pole, line) == StrictResult.StrictlyTrue,
+            (ConicTools.IsProperPolarLine(conic, pole, line) == StrictResult.StrictlyTrue,
              $"{c.LineId} 是 {c.PoleId} 关于 {c.ConicId} 的极线"),
 
         ClaimTangentAt c

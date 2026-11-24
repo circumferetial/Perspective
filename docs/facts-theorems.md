@@ -41,29 +41,29 @@
 **终端专用事实**：`AlgebraicRelationFact` 只用于表达"某表达式为定值/等于另一表达式"这类
 长尾结论，不进入组合型规则的候选枚举（防爆炸）；新增其它终端事实时也应遵守这条。
 
-## 2. 定理规则（当前 17 条）
+## 2. 定理规则（原 17 条；#6、#12 已退役，另有 5 条 P2/P3 补充规则见下方注记）
 
 | # | 规则 | 前提 | 结论 | 等级 | 说明 |
 |---|---|---|---|---|---|
 | 1 | 切点弦极线 | 两条切线、Q 在两线上 | `PolarOfFact(切点弦, Q)` | Projective | 切点必须在曲线上 |
 | 2 | La Hire 互反 | 两条极线、Q 在 P 的极线上 | `OnLineFact(P, Q的极线)` | Projective | 配极对称性 |
 | 3 | 极点极线调和束 | 极线、割线、割线与极线交点、两曲线交点 | `HarmonicFact` | Projective | 严格回验交比 |
-| 4 | 点差法中点斜率积 | 中心、中点、两点在曲线上 | `ConjugateDirectionsFact` / `ConstantSlopeProductFact` | Affine | 射影不保中点/斜率 |
+| 4 | 点差法（收窄） | 中心、中点、两点在曲线上 | `ConstantSlopeProductFact`（轴对齐坐标系显示性推论，**非**仿射不变量） | 固定轴向特例 | 共轭方向已迁到 `ConicChordPolarConjugateRule`（弦方向点极线，Affine，中心自由）；本规则只保留斜率积显示 |
 | 5 | 极线基本定理 | 点在曲线上 + 其极线 | `TangentFact` | Projective | 曲线上点的极线即切线 |
-| 6 | 共轭直径平分弦 | 共轭方向、弦的两端在曲线上 | `MidpointFact` | Affine | |
+| 6 | ~~共轭直径平分弦~~ | — | `MidpointFact` | Affine | **已退役（P3 管线替代）**：弦中点改由 `ConicChordPolarHarmonicRule` + `MidpointFromHarmonicInfinityRule` 推导（中心自由、覆盖抛物线） |
 | 7 | 同线三点共线 | 三点在同一直线上 | `CollinearFact` | Projective | 平凡但补链 |
 | 8 | 同点三线共点 | 三线过同一点 | `ConcurrentFact` | Projective | 平凡但补链 |
 | 9 | Pascal | 六点内接同一非退化曲线 | `CollinearFact`（对边交点） | Projective | 组合型，有成本闸 |
 | 10 | 完全四点形调和性 | 四点为一般位置 | 6 条 `HarmonicFact` | Projective | 组合型，有成本闸 |
 | 11 | Brianchon | 六条切线切同一非退化曲线 | `ConcurrentFact`（主对角线） | Projective | Pascal 对偶 |
-| 12 | 平行传递 | 两条 `ParallelFact` | `ParallelFact` | Affine | 三线互异 + 严通道回验 |
+| 12 | ~~平行传递~~ | — | `ParallelFact` | Affine | **已退役**：改由 `ParallelImpliesSharedInfinityPointRule` + `ConcurrentAtInfinityImpliesParallelRule`（l∞ 方向点 + #8 共点）推导，对 n 条平行线通用 |
 | 13 | 垂直与平行相容 | `PerpendicularFact` + `ParallelFact` | `PerpendicularFact` | Similarity | 垂直非仿射不变量 |
 | 14 | 平行线的对应角相等 | `ParallelFact` | `AngleEqualFact` | Similarity | θ(L₁,M) ≡ θ(L₂,M) |
 | 15 | 角相等传递 | 两条 `AngleEqualFact`（共享线对） | `AngleEqualFact` | Similarity | 符号相乘：s₁·s₂ |
 | 16 | 面积比传递 | 两条 `AreaRatioFact`（共享三角形） | `AreaRatioFact` | Affine | S₁/S₂·S₂/S₃ |
 | 17 | 线段比传递 | 两条 `SegmentRatioFact`（共享线段） | `SegmentRatioFact` | Similarity | 平方形式回验（无根号） |
 
-## 3. 已知缺口（按优先级）
+> **补充（P2 实验，尚未替换 #12）**：\ConcurrentAtInfinityImpliesParallelRule\（Affine）——三线共点于无穷远线 ⇒ 两两平行，\n> 用 \l∞\ 上的方向点统一表达平行，不依赖传递链；对 n 条平行线通用。方向点去重（\SameStrictly\）与 l∞ 惰性登记待完善。\n\n## 3. 已知缺口（按优先级）
 
 > 说明：比例/角度/平行/垂直事实已补齐（P1-4）。当前主要缺口是"长尾定值组合"的
 > 通用载体（已由 `AlgebraicRelationFact` 覆盖终端情形）与跨模型定理搬运。

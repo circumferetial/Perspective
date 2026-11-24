@@ -69,42 +69,44 @@ public class RuleTests
         Assert.DoesNotContain(new TangentFact("L", "C", "P"), off.Facts);
     }
 
-    // ---------- 命题 6：共轭直径平分弦 ----------
+    // ---------- 命题 6（P3 管线替代）：弦中点由"方向点极线 + 调和桥"推导 ----------
     [Fact]
-    public void ConjugateDiameterBisectsChord_PositiveAndForgedMidpoint()
+    public void ChordMidpoint_IsDerivedByPolarHarmonicPipeline()
     {
         var circle = Scenes.Circle4;
         var a = HPoint.FromFormula("1", "sqrt(3)");
         var b = HPoint.FromFormula("1", "-sqrt(3)");
 
-        FactBase Build(HPoint m)
+        FactBase Build(bool bOnConic)
         {
             var f = new FactBase { CurrentLevel = TransformLevel.Affine };
             f.AddConic("C", circle);
             f.AddPoint("A", a);
             f.AddPoint("B", b);
-            f.AddPoint("M", m);
             f.AddLine("AB", HLine.FromPoints(a, b));
-            f.AddLine("OM", HLine.FromPoints(HPoint.FromCartesian(0, 0), m));
             f.AddFact(new OnConicFact("A", "C"), "t");
-            f.AddFact(new OnConicFact("B", "C"), "t");
+            if (bOnConic) f.AddFact(new OnConicFact("B", "C"), "t");
             f.AddFact(new OnLineFact("A", "AB"), "t");
             f.AddFact(new OnLineFact("B", "AB"), "t");
-            f.AddFact(new OnLineFact("M", "AB"), "t");
-            f.AddFact(new ConjugateDirectionsFact("OM", "AB", "C"), "t");
             return f;
         }
 
-        var ok = Build(HPoint.FromCartesian(1, 0));
-        new TheoremEngine().Register<ConjugateDiameterBisectsChordRule>().RunToFixedPoint(ok);
-        Assert.Contains(new MidpointFact("M", "A", "B"), ok.Facts);
+        TheoremEngine Engine() => new TheoremEngine()
+            .Register<ConicChordPolarHarmonicRule>()
+            .Register<MidpointFromHarmonicInfinityRule>();
 
-        var bad = Build(HPoint.FromFormula("1", "1/2"));
-        new TheoremEngine().Register<ConjugateDiameterBisectsChordRule>().RunToFixedPoint(bad);
-        Assert.DoesNotContain(new MidpointFact("M", "A", "B"), bad.Facts);
+        var ok = Build(bOnConic: true);
+        Engine().RunToFixedPoint(ok);
+        var mid = Assert.Single(ok.Midpoints);
+        Assert.Equal(StrictResult.StrictlyTrue,
+            PointTools.SameStrictly(ok.Points[mid.MidId], HPoint.FromCartesian(1, 0)));
+
+        // 端点不在曲线上：不构成"曲线的弦"，管线不得产出中点
+        var bad = Build(bOnConic: false);
+        Engine().RunToFixedPoint(bad);
+        Assert.Empty(bad.Midpoints);
     }
-
-    // ---------- 命题 7：同线三点共线 ----------
+// ---------- 命题 7：同线三点共线 ----------
     [Fact]
     public void CollinearFromCommonLine_PositiveNegativeAndPermutationDedup()
     {

@@ -244,9 +244,9 @@ public readonly struct PolePolarReciprocityRule : IFactRule<PolePolarReciprocity
                 // 前提严通道回验：确认两条线确实分别是两极点的极线（不信任 PolarOfFact 标签）。
                 // 判据收敛在 ConicTools.IsPolarLine（与裁决器共用，避免两处实现漂移）。
                 var conic = facts.Conics[pFact.ConicId];
-                if (ConicTools.IsPolarLine(conic, facts.Points[pFact.PoleId], facts.Lines[pFact.LineId])
+                if (ConicTools.IsProperPolarLine(conic, facts.Points[pFact.PoleId], facts.Lines[pFact.LineId])
                     != StrictResult.StrictlyTrue) continue;
-                if (ConicTools.IsPolarLine(conic, facts.Points[qFact.PoleId], facts.Lines[qFact.LineId])
+                if (ConicTools.IsProperPolarLine(conic, facts.Points[qFact.PoleId], facts.Lines[qFact.LineId])
                     != StrictResult.StrictlyTrue) continue;
 
                 // 严通道验真：L_Q 真的严格经过 P
@@ -338,7 +338,7 @@ public readonly struct HarmonicPolarBundleRule : IFactRule<HarmonicPolarBundleRu
 }
 
 /// <summary>
-/// 命题 4：有心圆锥曲线点差法（仅 Affine 及以上视角有效！切到 Projective 自动屏蔽）
+/// 命题 4（收窄版）：有心圆锥曲线的"轴对齐斜率积显示性推论"。
 /// 【前提】① 有心非退化（δ = M₀₀M₁₁ − M₀₁² ≠ 0 且 Δ = det C ≠ 0；抛物线无有限中心、
 ///         退化曲线不适用，由 ConicTools.Classify 判定）；② M 严格为 AB 中点
 ///         （IsMidpoint 回验）；③ A、B 严格在曲线上（ContainsStrictly 回验）；
@@ -359,7 +359,7 @@ public readonly struct ConicMidpointSlopeRule : IFactRule<ConicMidpointSlopeRule
 {
     public static string Title => "点差法中点斜率积定理";
     public static TransformLevel RequiredLevel => TransformLevel.Affine;
-    public static Type[] ConclusionTypes => [typeof(ConjugateDirectionsFact), typeof(ConstantSlopeProductFact)];
+    public static Type[] ConclusionTypes => [typeof(ConstantSlopeProductFact)];
     public static Type[] PremiseTypes => [typeof(CenterOfConicFact), typeof(MidpointFact), typeof(OnConicFact)]; // 射影视角不保中点与斜率积！
 
     public static int Apply(FactBase facts)
@@ -411,15 +411,8 @@ public readonly struct ConicMidpointSlopeRule : IFactRule<ConicMidpointSlopeRule
 
                 if (conj.VerifyStrictZero() != StrictResult.StrictlyTrue) continue;
 
-                if (facts.AddDerivedFact(
-                        new ConjugateDirectionsFact(lineOM, lineAB, cen.ConicId),
-                        RuleIds.ConicMidpointSlope,
-                        cen, mid,
-                        new OnConicFact(mid.AId, cen.ConicId),
-                        new OnConicFact(mid.BId, cen.ConicId)))
-                    count++;
-
-                // 特例：无交叉项且斜率有限时，额外给出斜率积定值 −M₀₀/M₁₁
+                                // 特例：无交叉项（轴对齐坐标系）且斜率有限时，额外给"当前坐标系下的显示性推论" −M₀₀/M₁₁。
+                // 注意：这不是 Affine 不变量——剪切/旋转会改变它；不要把它当可搬运的共轭结论。
                 if (m.M01.VerifyStrictZero() != StrictResult.StrictlyTrue) continue;
 
                 var k1 = facts.Lines[lineOM].TryGetSlope();
@@ -473,85 +466,13 @@ public readonly struct PolarFundamentalRule : IFactRule<PolarFundamentalRule>
             var pole = facts.Points[polar.PoleId];
 
             if (conic.ContainsStrictly(pole) != StrictResult.StrictlyTrue) continue;
-            if (ConicTools.IsPolarLine(conic, pole, facts.Lines[polar.LineId]) != StrictResult.StrictlyTrue) continue;
+            if (ConicTools.IsProperPolarLine(conic, pole, facts.Lines[polar.LineId]) != StrictResult.StrictlyTrue) continue;
 
             if (facts.AddDerivedFact(
                     new TangentFact(polar.LineId, polar.ConicId, polar.PoleId),
                     RuleIds.PolarFundamental,
                     polar,
                     new OnConicFact(polar.PoleId, polar.ConicId)))
-                count++;
-        }
-
-        return count;
-    }
-}
-
-/// <summary>
-/// 命题 6：共轭直径平分弦——点差法的逆命题。
-/// 【前提】① 曲线有心非退化（Ellipse/Circle/Hyperbola）；② 已知共轭方向事实
-///         ConjugateDirectionsFact(OM, AB, C)；③ 弦 AB 与曲线恰有 2 个已登记交点；
-///         ④ 交点 M = OM ∩ AB 是已登记的有限点；⑤ 严通道回验 A、B 在曲线上且
-///         M 严格是 AB 中点（防止事实库污染）。
-/// 【结论】MidpointFact(M, A, B)。
-/// 【推导】设中心 O，弦方向 d，弦上一点 M。若 dᵀC₂(M−O) = 0，则沿弦取 M ± t·d，
-///         两点的二次型值相等（因为线性项 2t·dᵀC₂(M−O) = 0），故两点同时落在曲线上
-///         ⟹ M 就是弦 AB 的中点。这正是点差法结论的逆命题。
-/// 【等级】Affine。
-/// </summary>
-public readonly struct ConjugateDiameterBisectsChordRule : IFactRule<ConjugateDiameterBisectsChordRule>
-{
-    public static string Title => "共轭直径平分弦定理";
-    public static TransformLevel RequiredLevel => TransformLevel.Affine;
-    public static Type[] ConclusionTypes => [typeof(MidpointFact)];
-    public static Type[] PremiseTypes => [typeof(ConjugateDirectionsFact), typeof(OnLineFact), typeof(OnConicFact)];
-
-    public static int Apply(FactBase facts)
-    {
-        int count = 0;
-
-        foreach (var conj in facts.ConjugateDirections)
-        {
-            if (!facts.Conics.TryGetValue(conj.ConicId, out var conic)) continue;
-
-            var kind = ConicTools.Classify(conic).Kind;
-            if (kind is not (ConicKind.Ellipse or ConicKind.Circle or ConicKind.Hyperbola)) continue;
-
-            // 弦上的曲线交点应恰为两个
-            var onChord = facts.PointsOn(conj.Line2Id)
-                .Where(pid => facts.HasOnConic(pid, conj.ConicId))
-                .ToList();
-            if (onChord.Count != 2) continue;
-
-            // M = OM ∩ AB；必须是已登记的有限点
-            var inter = HLine.Intersect(facts.Lines[conj.Line1Id], facts.Lines[conj.Line2Id]);
-            if (inter.IsAtInfinity) continue;
-
-            string? midId = null;
-            foreach (var (pid, pt) in facts.Points)
-                if (PointTools.SameStrictly(pt, inter) == StrictResult.StrictlyTrue)
-                {
-                    midId = pid;
-                    break;
-                }
-            if (midId is null) continue;
-
-            var ptM = facts.Points[midId];
-            var ptA = facts.Points[onChord[0]];
-            var ptB = facts.Points[onChord[1]];
-
-            if (GeometryAudit.IsMidpoint(ptM, ptA, ptB) != StrictResult.StrictlyTrue) continue;
-            if (conic.ContainsStrictly(ptA) != StrictResult.StrictlyTrue) continue;
-            if (conic.ContainsStrictly(ptB) != StrictResult.StrictlyTrue) continue;
-
-            if (facts.AddDerivedFact(
-                    new MidpointFact(midId, onChord[0], onChord[1]),
-                    RuleIds.ConjugateDiameterBisectsChord,
-                    conj,
-                    new OnLineFact(onChord[0], conj.Line2Id),
-                    new OnLineFact(onChord[1], conj.Line2Id),
-                    new OnConicFact(onChord[0], conj.ConicId),
-                    new OnConicFact(onChord[1], conj.ConicId)))
                 count++;
         }
 
@@ -999,6 +920,11 @@ public readonly struct CollinearFromCommonLineRule : IFactRule<CollinearFromComm
                     !facts.Points.TryGetValue(pts[j], out var b) ||
                     !facts.Points.TryGetValue(pts[k], out var c)) continue;
 
+                // 三点坐标必须两两互异（id 不同但坐标重合时，"三点共线"是退化命题，不能入库）
+                if (PointTools.SameStrictly(a, b) == StrictResult.StrictlyTrue ||
+                    PointTools.SameStrictly(a, c) == StrictResult.StrictlyTrue ||
+                    PointTools.SameStrictly(b, c) == StrictResult.StrictlyTrue) continue;
+
                 // 严通道回验：坐标确实共线
                 if (PointTools.Collinear(a, b, c) != StrictResult.StrictlyTrue) continue;
 
@@ -1074,45 +1000,6 @@ public readonly struct ConcurrentFromCommonPointRule : IFactRule<ConcurrentFromC
         return count;
     }
 
-}
-
-/// <summary>
-/// 命题 12：平行传递（L₁∥L₂ 且 L₂∥L₃ ⇒ L₁∥L₃，三线互异）。
-/// 【前提】两条 ParallelFact；严通道回验三线互不重合且确实平行（不信标签）。
-/// 【结论】ParallelFact(L₁, L₃)。
-/// 【等级】Affine——平行是仿射不变量。
-/// </summary>
-public readonly struct ParallelTransitivityRule : IFactRule<ParallelTransitivityRule>
-{
-    public static string Title => "平行传递";
-    public static TransformLevel RequiredLevel => TransformLevel.Affine;
-    public static Type[] ConclusionTypes => [typeof(ParallelFact)];
-    public static Type[] PremiseTypes => [typeof(ParallelFact)];
-
-    public static int Apply(FactBase facts)
-    {
-        int count = 0;
-        foreach (var first in facts.Parallels.ToList())
-        {
-            foreach (var thirdId in facts.LinesParallelTo(first.Line2Id).ToList())
-            {
-                if (thirdId == first.Line1Id) continue;
-                if (!facts.Lines.TryGetValue(first.Line1Id, out var a) ||
-                    !facts.Lines.TryGetValue(thirdId, out var b)) continue;
-
-                if (LineTools.Same(a, b) == StrictResult.StrictlyTrue) continue;
-                if (GeometryAudit.AreParallel(a, b) != StrictResult.StrictlyTrue) continue;
-
-                var second = ParallelFact.Create(first.Line2Id, thirdId);
-                if (facts.AddDerivedFact(
-                        ParallelFact.Create(first.Line1Id, thirdId),
-                        RuleIds.ParallelTransitivity,
-                        first, second))
-                    count++;
-            }
-        }
-        return count;
-    }
 }
 
 /// <summary>
@@ -1357,5 +1244,291 @@ public readonly struct SegmentRatioTransitivityRule : IFactRule<SegmentRatioTran
 
         var candidate = SegmentRatioFact.Create(a1, a2, b1, b2, value);
         return facts.AddDerivedFact(candidate, RuleIds.SegmentRatioTransitivity, first, second) ? 1 : 0;
+    }
+}
+/// <summary>
+/// P2 实验规则：三线共点于无穷远线 ⇒ 两两平行（#12 平行传递的"基础设施版"）。
+/// 【前提】ConcurrentFact(L1,L2,L3)；严通道回验 L1∩L2 是无穷远点且 L3 也过它。
+/// 【结论】三对 ParallelFact（去重、严通道回验 AreParallel）。
+/// 【等级】Affine——"平行"依赖 l∞ 的存在。与 #12 相比不依赖传递链：对 n 条平行线通用。
+/// </summary>
+public readonly struct ConcurrentAtInfinityImpliesParallelRule : IFactRule<ConcurrentAtInfinityImpliesParallelRule>
+{
+    public static string Title => "共点于无穷远线 ⇒ 两两平行";
+    public static TransformLevel RequiredLevel => TransformLevel.Affine;
+    public static Type[] ConclusionTypes => [typeof(ParallelFact)];
+    public static Type[] PremiseTypes => [typeof(ConcurrentFact), typeof(OnLineFact)];
+
+    public static int Apply(FactBase facts)
+    {
+        int count = 0;
+        foreach (var concurrent in facts.Concurrents.ToList())
+        {
+            if (!facts.Lines.TryGetValue(concurrent.L1Id, out var l1) ||
+                !facts.Lines.TryGetValue(concurrent.L2Id, out var l2) ||
+                !facts.Lines.TryGetValue(concurrent.L3Id, out var l3)) continue;
+
+            var meeting = HLine.Intersect(l1, l2);
+            if (!meeting.IsAtInfinity) continue;
+            if (l3.ContainsStrictly(meeting) != StrictResult.StrictlyTrue) continue;
+
+            foreach (var (x, y) in new[]
+                     {
+                         (concurrent.L1Id, concurrent.L2Id),
+                         (concurrent.L1Id, concurrent.L3Id),
+                         (concurrent.L2Id, concurrent.L3Id)
+                     })
+            {
+                if (!facts.Lines.TryGetValue(x, out var lx) ||
+                    !facts.Lines.TryGetValue(y, out var ly)) continue;
+
+                if (LineTools.Same(lx, ly) == StrictResult.StrictlyTrue) continue;
+                if (GeometryAudit.AreParallel(lx, ly) != StrictResult.StrictlyTrue) continue;
+
+                if (facts.AddDerivedFact(
+                        ParallelFact.Create(x, y),
+                        RuleIds.ConcurrentAtInfinityImpliesParallel,
+                        concurrent))
+                    count++;
+            }
+        }
+        return count;
+    }
+}
+/// <summary>
+/// P2 实验规则：平行 ⇒ 两线共享同一个无穷远方向点。
+/// 【作用】把已有 ParallelFact 转成 OnLineFact(D∞, L)，使 #8（同点三线共点）能识别平行，
+///         从而用"共点于 l∞ ⇒ 两两平行"替代 #12 的传递链。
+/// 【前提】ParallelFact + AreParallel 严通道回验；两线互异。
+/// 【守卫】仅在 Affine 及以下生效；方向点先经 GetOrCreatePointAtInfinity（SameStrictly 去重）。
+/// </summary>
+public readonly struct ParallelImpliesSharedInfinityPointRule : IFactRule<ParallelImpliesSharedInfinityPointRule>
+{
+    public static string Title => "平行 ⇒ 共享无穷远方向点";
+    public static TransformLevel RequiredLevel => TransformLevel.Affine;
+    public static Type[] ConclusionTypes => [typeof(OnLineFact)];
+    public static Type[] PremiseTypes => [typeof(ParallelFact)];
+
+    public static int Apply(FactBase facts)
+    {
+        int count = 0;
+        foreach (var parallel in facts.Parallels.ToList())
+        {
+            if (!facts.Lines.TryGetValue(parallel.Line1Id, out var l1) ||
+                !facts.Lines.TryGetValue(parallel.Line2Id, out var l2)) continue;
+
+            if (LineTools.Same(l1, l2) == StrictResult.StrictlyTrue) continue;
+            if (GeometryAudit.AreParallel(l1, l2) != StrictResult.StrictlyTrue) continue;
+
+            var infinityId = facts.GetOrCreateInfinityLine();
+            var infinity = facts.Lines[infinityId];
+
+            var d1 = HLine.Intersect(l1, infinity);
+            var d2 = HLine.Intersect(l2, infinity);
+            if (!d1.IsAtInfinity || !d2.IsAtInfinity) continue;
+
+            var id1 = facts.GetOrCreatePointAtInfinity(d1);
+            var id2 = facts.GetOrCreatePointAtInfinity(d2);
+            if (id1 != id2) continue;   // 去重后方向仍不同 ⇒ 不写（保守）
+
+            if (facts.AddDerivedFact(new OnLineFact(id1, parallel.Line1Id),
+                    RuleIds.ParallelImpliesSharedInfinityPoint, parallel))
+                count++;
+            if (facts.AddDerivedFact(new OnLineFact(id1, parallel.Line2Id),
+                    RuleIds.ParallelImpliesSharedInfinityPoint, parallel))
+                count++;
+        }
+        return count;
+    }
+}
+/// <summary>
+/// P3a 中点桥：调和共轭于无穷远点 ⇒ 中点。
+/// 【前提】HarmonicFact(A,B;M,D∞)，其中 D∞ 是唯一的无穷远点，A≠B（坐标互异需被证明）。
+/// 【结论】MidpointFact(M,A,B)。
+/// 【推导】仿射直线上，中点 M 与无穷远点 D∞ 关于 A、B 调和共轭：(A,B;M,D∞) = −1。
+/// 【守卫】① 恰有一个无穷远点；② A、B 坐标严格互异（SameStrictly 必须为 StrictlyFalse）；
+///         ③ 调和严格回验；④ IsMidpoint 交叉验证失败则不写（两套定义必须一致）。
+/// 【等级】Affine——中点依赖 l∞ 仿射结构。
+/// </summary>
+public readonly struct MidpointFromHarmonicInfinityRule : IFactRule<MidpointFromHarmonicInfinityRule>
+{
+    public static string Title => "调和共轭于无穷远点 ⇒ 中点";
+    public static TransformLevel RequiredLevel => TransformLevel.Affine;
+    public static Type[] ConclusionTypes => [typeof(MidpointFact)];
+    public static Type[] PremiseTypes => [typeof(HarmonicFact)];
+
+    public static int Apply(FactBase facts)
+    {
+        int count = 0;
+        foreach (var harmonic in facts.Harmonics.ToList())
+        {
+            var ids = new[] { harmonic.AId, harmonic.BId, harmonic.CId, harmonic.DId };
+            if (ids.Any(id => !facts.Points.ContainsKey(id))) continue;
+
+            var infinityIds = ids.Where(id => facts.Points[id].IsAtInfinity).ToList();
+            if (infinityIds.Count != 1) continue;
+            var infinityId = infinityIds[0];
+            var infinity = facts.Points[infinityId];
+
+            var finiteIds = ids.Where(id => id != infinityId).ToList();
+            foreach (var midId in finiteIds)
+            {
+                var endpointIds = finiteIds.Where(id => id != midId).ToList();
+                if (endpointIds.Count != 2) continue;
+
+                var pA = facts.Points[endpointIds[0]];
+                var pB = facts.Points[endpointIds[1]];
+                var pM = facts.Points[midId];
+
+                // A ≠ B 必须被证明（重合时中点无定义；IsHarmonic 也会因不互异而拒绝）
+                if (PointTools.SameStrictly(pA, pB) != StrictResult.StrictlyFalse) continue;
+
+                if (GeometryAudit.IsHarmonic(pA, pB, pM, infinity) != StrictResult.StrictlyTrue) continue;
+                if (GeometryAudit.IsMidpoint(pM, pA, pB) != StrictResult.StrictlyTrue) continue;   // 交叉验证
+
+                var (aId, bId) = string.CompareOrdinal(endpointIds[0], endpointIds[1]) <= 0
+                    ? (endpointIds[0], endpointIds[1])
+                    : (endpointIds[1], endpointIds[0]);
+
+                if (facts.AddDerivedFact(new MidpointFact(midId, aId, bId),
+                        RuleIds.MidpointFromHarmonicInfinity, harmonic))
+                    count++;
+            }
+        }
+        return count;
+    }
+}
+/// <summary>
+/// P3b：圆锥曲线弦的"方向点极线"给出调和共轭（#4 共轭部分与 #6 的射影化基础）。
+/// 【前提】非退化圆锥曲线 C；弦 AB（A、B 是已登记在 C 与直线 L 上的点）；
+///         D∞ = L ∩ l∞ 是弦方向的无穷远点；M = (C·D∞) ∩ L。
+/// 【结论】HarmonicFact(A, B; M, D∞)。
+/// 【推导】配极定理：过 P 的割线交 C 于 A、B，则 P 的极线与 AB 的交点是 P 关于 A、B 的调和共轭。
+///         取 P = D∞（弦方向的无穷远点），其极线即"共轭直径"，M 与 D∞ 调和共轭 ⇒ 再由中点桥得中点。
+/// 【覆盖】椭圆/双曲/抛物线统一（不需要中心）；抛物线时极线是直径 y=2a/m。
+/// 【守卫】det(C)≠0；极线非零；D∞ 在无穷远；M 有限；调和严通道回验。
+/// 【等级】Affine（依赖 l∞）。
+/// </summary>
+public readonly struct ConicChordPolarHarmonicRule : IFactRule<ConicChordPolarHarmonicRule>
+{
+    public static string Title => "弦方向点极线 ⇒ 调和共轭";
+    public static TransformLevel RequiredLevel => TransformLevel.Affine;
+    public static Type[] ConclusionTypes => [typeof(HarmonicFact)];
+    public static Type[] PremiseTypes => [typeof(OnConicFact), typeof(OnLineFact)];
+
+    public static int Apply(FactBase facts)
+    {
+        int count = 0;
+        foreach (var (conicId, conic) in facts.Conics)
+        {
+            // 非退化是"正常配极"的前提
+            if (conic.Matrix.Determinant().VerifyStrictZero() != StrictResult.StrictlyFalse)
+                continue;
+
+            foreach (var lineId in facts.LineIdsWithPoints.ToList())
+            {
+                if (!facts.Lines.TryGetValue(lineId, out var chord)) continue;
+
+                var onChord = facts.PointsOn(lineId)
+                    .Where(pid => facts.HasOnConic(pid, conicId))
+                    .Distinct()
+                    .ToList();
+                if (onChord.Count != 2) continue;
+
+                var infinityLineId = facts.GetOrCreateInfinityLine();
+                var direction = HLine.Intersect(chord, facts.Lines[infinityLineId]);
+                if (!direction.IsAtInfinity) continue;
+
+                var directionId = facts.GetOrCreatePointAtInfinity(direction);
+
+                var polar = conic.PolarLine(direction);
+                var zero = (polar.A.VerifyStrictZero() == StrictResult.StrictlyTrue)
+                        && (polar.B.VerifyStrictZero() == StrictResult.StrictlyTrue)
+                        && (polar.C.VerifyStrictZero() == StrictResult.StrictlyTrue);
+                if (zero) continue;
+
+                var mid = HLine.Intersect(polar, chord);
+                if (mid.IsAtInfinity) continue;
+
+                var midId = facts.GetOrCreatePoint(mid);
+
+                var (aId, bId) = string.CompareOrdinal(onChord[0], onChord[1]) <= 0
+                    ? (onChord[0], onChord[1])
+                    : (onChord[1], onChord[0]);
+
+                if (GeometryAudit.IsHarmonic(
+                        facts.Points[aId], facts.Points[bId],
+                        facts.Points[midId], facts.Points[directionId]) != StrictResult.StrictlyTrue)
+                    continue;
+
+                if (facts.AddDerivedFact(
+                        new HarmonicFact(aId, bId, midId, directionId),
+                        RuleIds.ConicChordPolarHarmonic,
+                        new OnConicFact(aId, conicId),
+                        new OnConicFact(bId, conicId),
+                        new OnLineFact(aId, lineId),
+                        new OnLineFact(bId, lineId)))
+                    count++;
+            }
+        }
+        return count;
+    }
+}
+/// <summary>
+/// P3 收尾：#4 共轭部分的替代产出——弦方向点的极线就是共轭直径。
+/// 【前提】非退化圆锥曲线 C；弦 AB（A、B 是 C 与直线 L 上的已登记点）。
+/// 【结论】ConjugateDirectionsFact(极线, L, C)：弦方向与极线方向共轭。
+/// 【推导】D∞ = L ∩ l∞ 是弦方向点；C·D∞ 是 D∞ 的极线，即该方向的共轭直径；
+///         对有心曲线它过中心，对抛物线它是平行于轴的直径——所以不需要 CenterOfConicFact。
+/// 【等级】Affine。
+/// </summary>
+public readonly struct ConicChordPolarConjugateRule : IFactRule<ConicChordPolarConjugateRule>
+{
+    public static string Title => "弦方向点极线 ⇒ 共轭方向";
+    public static TransformLevel RequiredLevel => TransformLevel.Affine;
+    public static Type[] ConclusionTypes => [typeof(ConjugateDirectionsFact)];
+    public static Type[] PremiseTypes => [typeof(OnConicFact), typeof(OnLineFact)];
+
+    public static int Apply(FactBase facts)
+    {
+        int count = 0;
+        foreach (var (conicId, conic) in facts.Conics)
+        {
+            if (conic.Matrix.Determinant().VerifyStrictZero() != StrictResult.StrictlyFalse)
+                continue;
+
+            foreach (var lineId in facts.LineIdsWithPoints.ToList())
+            {
+                if (!facts.Lines.TryGetValue(lineId, out var chord)) continue;
+
+                var onChord = facts.PointsOn(lineId)
+                    .Where(pid => facts.HasOnConic(pid, conicId))
+                    .Distinct()
+                    .ToList();
+                if (onChord.Count != 2) continue;
+
+                var infinityLineId = facts.GetOrCreateInfinityLine();
+                var direction = HLine.Intersect(chord, facts.Lines[infinityLineId]);
+                if (!direction.IsAtInfinity) continue;
+
+                var polar = conic.PolarLine(direction);
+                var zero = (polar.A.VerifyStrictZero() == StrictResult.StrictlyTrue)
+                        && (polar.B.VerifyStrictZero() == StrictResult.StrictlyTrue)
+                        && (polar.C.VerifyStrictZero() == StrictResult.StrictlyTrue);
+                if (zero) continue;
+
+                var polarId = facts.GetOrCreateLine(polar);
+
+                if (facts.AddDerivedFact(
+                        new ConjugateDirectionsFact(polarId, lineId, conicId),
+                        RuleIds.ConicChordPolarConjugate,
+                        new OnConicFact(onChord[0], conicId),
+                        new OnConicFact(onChord[1], conicId),
+                        new OnLineFact(onChord[0], lineId),
+                        new OnLineFact(onChord[1], lineId)))
+                    count++;
+            }
+        }
+        return count;
     }
 }

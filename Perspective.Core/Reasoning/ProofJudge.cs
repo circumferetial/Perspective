@@ -194,8 +194,8 @@ public static class ProofJudge
                     !facts.Conics.TryGetValue(c.ConicId, out var pConic))
                     return StrictResult.NoSymbolicData;
 
-                // 验证 C*P 与给定直线严格成比例（判据收敛在 ConicTools.IsPolarLine）
-                return ConicTools.IsPolarLine(pConic, polePt, lTarget);
+                // 验证 C*P 与给定直线严格成比例；且要求曲线非退化、极线非零（正常极线）
+                return ConicTools.IsProperPolarLine(pConic, polePt, lTarget);
 
             case ClaimHarmonic c:
                 if (!facts.Points.TryGetValue(c.AId, out var pa) || !facts.Points.TryGetValue(c.BId, out var pb) ||

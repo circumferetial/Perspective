@@ -75,6 +75,40 @@ public static class ConicTools
     public static StrictResult IsPolarLine(Conic conic, HPoint pole, HLine line) =>
         LineTools.Same(conic.PolarLine(pole), line);
 
+    /// <summary>
+    /// 严格（"正常"）极线：额外要求二次型非退化（det C ≠ 0）且极线本身非零向量。
+    /// 【为什么需要】退化二次型在奇点处的极线是零向量，会被 <see cref="LineTools.Same"/> 误判为
+    /// "与零直线成比例"，让"任意零直线都是该点的极线"通过；随后规则可写入假 TangentFact。
+    /// 【语义】det 未证非零（符号参数/近似数据）时不返回 StrictlyTrue——未证明的非退化不能当已知。
+    /// </summary>
+    public static StrictResult IsProperPolarLine(Conic conic, HPoint pole, HLine line)
+    {
+        var det = conic.Matrix.Determinant().VerifyStrictZero();
+        if (det == StrictResult.StrictlyTrue) return StrictResult.StrictlyFalse;
+        if (det != StrictResult.StrictlyFalse) return det;   // NearZeroUnproven / NoSymbolicData
+
+        var polar = conic.PolarLine(pole);
+        var zero = AllZero(polar.A, polar.B, polar.C);
+        if (zero == StrictResult.StrictlyTrue) return StrictResult.StrictlyFalse;
+        if (zero != StrictResult.StrictlyFalse) return zero;
+
+        return LineTools.Same(polar, line);
+    }
+
+    private static StrictResult AllZero(ExactScalar a, ExactScalar b, ExactScalar c)
+    {
+        var ra = a.VerifyStrictZero();
+        var rb = b.VerifyStrictZero();
+        var rc = c.VerifyStrictZero();
+        if (ra == StrictResult.StrictlyFalse || rb == StrictResult.StrictlyFalse || rc == StrictResult.StrictlyFalse)
+            return StrictResult.StrictlyFalse;
+        if (ra == StrictResult.StrictlyTrue && rb == StrictResult.StrictlyTrue && rc == StrictResult.StrictlyTrue)
+            return StrictResult.StrictlyTrue;
+        if (ra == StrictResult.NoSymbolicData || rb == StrictResult.NoSymbolicData || rc == StrictResult.NoSymbolicData)
+            return StrictResult.NoSymbolicData;
+        return StrictResult.NearZeroUnproven;
+    }
+
     // ========================================================================
     // 分类：δ = M₀₀M₁₁ − M₀₁²，Δ = det C
     // 【前提】C 为实二次曲线矩阵（可含退化）。

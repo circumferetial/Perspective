@@ -59,4 +59,19 @@ public static class RuleIds
     public const string AreaRatioTransitivity = "area-ratio-transitivity";
 
     public const string SegmentRatioTransitivity = "segment-ratio-transitivity";
+
+    /// <summary>P2 实验：共点于无穷远线 ⇒ 两两平行（替代 #12 的传递写法）。</summary>
+    public const string ConcurrentAtInfinityImpliesParallel = "concurrent-at-infinity-implies-parallel";
+
+    /// <summary>P2 实验：平行 ⇒ 两线共享同一个无穷远方向点（为 #8/#12替代 提供基础设施）。</summary>
+    public const string ParallelImpliesSharedInfinityPoint = "parallel-implies-shared-infinity-point";
+
+    /// <summary>P3a：调和共轭于无穷远点 ⇒ 中点（中点桥）。</summary>
+    public const string MidpointFromHarmonicInfinity = "midpoint-from-harmonic-infinity";
+
+    /// <summary>P3b：圆锥曲线弦的"方向点极线"给出调和共轭（点差法/共轭直径的射影化）。</summary>
+    public const string ConicChordPolarHarmonic = "conic-chord-polar-harmonic";
+
+    /// <summary>P3 收尾：弦方向点的极线给出共轭方向（#4 共轭部分的替代产出）。</summary>
+    public const string ConicChordPolarConjugate = "conic-chord-polar-conjugate";
 }

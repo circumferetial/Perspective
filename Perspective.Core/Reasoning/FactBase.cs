@@ -45,6 +45,12 @@ public sealed record ConcurrentFact(string L1Id, string L2Id, string L3Id) : Geo
 }
 
 public sealed record ConjugateDirectionsFact(string Line1Id, string Line2Id, string ConicId) : GeoFact;
+/// <summary>
+/// 斜率积"定值"：k(Line1)·k(Line2) = Value。
+/// 【语义边界】这是**当前坐标系（轴对齐，M₀₁=0）下的显示性推论**，不是 Affine 不变量：
+///   仿射剪切或旋转都会让 M₀₁≠0 且斜率积改变；它也不随场景变换搬运（SceneTransfer 会丢弃）。
+///   共轭方向本身由 <see cref="ConjugateDirectionsFact"/> 表达（可搬运），本事实仅供解释/展示。
+/// </summary>
 public sealed record ConstantSlopeProductFact(string Line1Id, string Line2Id, ExactScalar Value) : GeoFact;
 
 /// <summary>两直线平行（不重合）。仿射不变量。</summary>
@@ -509,6 +515,76 @@ public sealed class FactBase
         Lines[newId] = HLine.FromPoints(Points[p1Id], Points[p2Id]);
         AddFact(new OnLineFact(p1Id, newId), $"[辅助连线] 过 {p1Id}, {p2Id} 作直线");
         AddFact(new OnLineFact(p2Id, newId), $"[辅助连线] 过 {p1Id}, {p2Id} 作直线");
+        return newId;
+    }
+
+    /// <summary>
+    /// 按 <see cref="LineTools.Same"/> 严格去重登记一条直线（用于辅助直线、极线等）。
+    /// 与 <see cref="GetOrCreateLine(string,string)"/> 的区别：后者由两点构造并记录 OnLine 事实。
+    /// </summary>
+    public string GetOrCreateLine(HLine line)
+    {
+        foreach (var (id, existing) in Lines)
+            if (LineTools.Same(existing, line) == StrictResult.StrictlyTrue)
+                return id;
+
+        string newId;
+        var k = 0;
+        do { newId = $"Lx{k++}"; } while (Lines.ContainsKey(newId));
+        Lines[newId] = line;
+        return newId;
+    }
+
+    /// <summary>
+    /// 登记/复用一般点（含由构造产生的辅助点）：按 SameStrictly 严格去重。
+    /// 与 <see cref="GetOrCreatePointAtInfinity"/> 分开：这里允许任何有限点。
+    /// </summary>
+    public string GetOrCreatePoint(HPoint candidate)
+    {
+        foreach (var (id, existing) in Points)
+            if (PointTools.SameStrictly(existing, candidate) == StrictResult.StrictlyTrue)
+                return id;
+
+        string newId;
+        var k = 0;
+        do { newId = $"P{k++}"; } while (Points.ContainsKey(newId));
+        Points[newId] = candidate;
+        return newId;
+    }
+
+    /// <summary>
+    /// 惰性登记无穷远线 $l_\infty$（仿射结构的载体）。只在确实需要仿射结构时调用，
+    /// 不作为全局假设——否则所有场景都会被强制成仿射视角。
+    /// </summary>
+    public string GetOrCreateInfinityLine()
+    {
+        const string id = "L_inf";
+        if (!Lines.ContainsKey(id)) Lines[id] = new HLine(0, 0, 1);
+        return id;
+    }
+
+    /// <summary>
+    /// 登记/复用无穷远方向点：按 <see cref="PointTools.SameStrictly"/> 严格去重
+    /// （不用数值归一或坐标字符串，避免符号探针撞零导致错误合并）。
+    /// 【语义】候选点必须确实在无穷远线上（W=0）；只在 StrictlyTrue 比例相等时合并，
+    /// 判定不确定时保守地新建（宁可多一个点，不可错并两个方向）。
+    /// </summary>
+    public string GetOrCreatePointAtInfinity(HPoint candidate)
+    {
+        if (!candidate.IsAtInfinity)
+            throw new ArgumentException("候选点不在无穷远线上（W≠0）。", nameof(candidate));
+
+        foreach (var (id, existing) in Points)
+        {
+            if (!existing.IsAtInfinity) continue;
+            if (PointTools.SameStrictly(existing, candidate) == StrictResult.StrictlyTrue)
+                return id;
+        }
+
+        string newId;
+        var k = 0;
+        do { newId = $"Dinf{k++}"; } while (Points.ContainsKey(newId));
+        Points[newId] = candidate;
         return newId;
     }
 
