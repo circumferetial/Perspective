@@ -62,4 +62,7 @@ public static class RuleIds
 
     /// <summary>P2 实验：共点于无穷远线 ⇒ 两两平行（替代 #12 的传递写法）。</summary>
     public const string ConcurrentAtInfinityImpliesParallel = "concurrent-at-infinity-implies-parallel";
+
+    /// <summary>P2 实验：平行 ⇒ 两线共享同一个无穷远方向点（为 #8/#12替代 提供基础设施）。</summary>
+    public const string ParallelImpliesSharedInfinityPoint = "parallel-implies-shared-infinity-point";
 }

@@ -1414,3 +1414,49 @@ public readonly struct ConcurrentAtInfinityImpliesParallelRule : IFactRule<Concu
         return count;
     }
 }
+/// <summary>
+/// P2 实验规则：平行 ⇒ 两线共享同一个无穷远方向点。
+/// 【作用】把已有 ParallelFact 转成 OnLineFact(D∞, L)，使 #8（同点三线共点）能识别平行，
+///         从而用"共点于 l∞ ⇒ 两两平行"替代 #12 的传递链。
+/// 【前提】ParallelFact + AreParallel 严通道回验；两线互异。
+/// 【守卫】仅在 Affine 及以下生效；方向点先经 GetOrCreatePointAtInfinity（SameStrictly 去重）。
+/// </summary>
+public readonly struct ParallelImpliesSharedInfinityPointRule : IFactRule<ParallelImpliesSharedInfinityPointRule>
+{
+    public static string Title => "平行 ⇒ 共享无穷远方向点";
+    public static TransformLevel RequiredLevel => TransformLevel.Affine;
+    public static Type[] ConclusionTypes => [typeof(OnLineFact)];
+    public static Type[] PremiseTypes => [typeof(ParallelFact)];
+
+    public static int Apply(FactBase facts)
+    {
+        int count = 0;
+        foreach (var parallel in facts.Parallels.ToList())
+        {
+            if (!facts.Lines.TryGetValue(parallel.Line1Id, out var l1) ||
+                !facts.Lines.TryGetValue(parallel.Line2Id, out var l2)) continue;
+
+            if (LineTools.Same(l1, l2) == StrictResult.StrictlyTrue) continue;
+            if (GeometryAudit.AreParallel(l1, l2) != StrictResult.StrictlyTrue) continue;
+
+            var infinityId = facts.GetOrCreateInfinityLine();
+            var infinity = facts.Lines[infinityId];
+
+            var d1 = HLine.Intersect(l1, infinity);
+            var d2 = HLine.Intersect(l2, infinity);
+            if (!d1.IsAtInfinity || !d2.IsAtInfinity) continue;
+
+            var id1 = facts.GetOrCreatePointAtInfinity(d1);
+            var id2 = facts.GetOrCreatePointAtInfinity(d2);
+            if (id1 != id2) continue;   // 去重后方向仍不同 ⇒ 不写（保守）
+
+            if (facts.AddDerivedFact(new OnLineFact(id1, parallel.Line1Id),
+                    RuleIds.ParallelImpliesSharedInfinityPoint, parallel))
+                count++;
+            if (facts.AddDerivedFact(new OnLineFact(id1, parallel.Line2Id),
+                    RuleIds.ParallelImpliesSharedInfinityPoint, parallel))
+                count++;
+        }
+        return count;
+    }
+}

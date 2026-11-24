@@ -518,6 +518,42 @@ public sealed class FactBase
         return newId;
     }
 
+    /// <summary>
+    /// 惰性登记无穷远线 $l_\infty$（仿射结构的载体）。只在确实需要仿射结构时调用，
+    /// 不作为全局假设——否则所有场景都会被强制成仿射视角。
+    /// </summary>
+    public string GetOrCreateInfinityLine()
+    {
+        const string id = "L_inf";
+        if (!Lines.ContainsKey(id)) Lines[id] = new HLine(0, 0, 1);
+        return id;
+    }
+
+    /// <summary>
+    /// 登记/复用无穷远方向点：按 <see cref="PointTools.SameStrictly"/> 严格去重
+    /// （不用数值归一或坐标字符串，避免符号探针撞零导致错误合并）。
+    /// 【语义】候选点必须确实在无穷远线上（W=0）；只在 StrictlyTrue 比例相等时合并，
+    /// 判定不确定时保守地新建（宁可多一个点，不可错并两个方向）。
+    /// </summary>
+    public string GetOrCreatePointAtInfinity(HPoint candidate)
+    {
+        if (!candidate.IsAtInfinity)
+            throw new ArgumentException("候选点不在无穷远线上（W≠0）。", nameof(candidate));
+
+        foreach (var (id, existing) in Points)
+        {
+            if (!existing.IsAtInfinity) continue;
+            if (PointTools.SameStrictly(existing, candidate) == StrictResult.StrictlyTrue)
+                return id;
+        }
+
+        string newId;
+        var k = 0;
+        do { newId = $"Dinf{k++}"; } while (Points.ContainsKey(newId));
+        Points[newId] = candidate;
+        return newId;
+    }
+
     /// <summary>把一条事实同时登记进类型视图与 id 索引（唯一维护点）。</summary>
     private void Index(GeoFact fact)
     {
