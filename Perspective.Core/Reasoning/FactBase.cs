@@ -45,6 +45,12 @@ public sealed record ConcurrentFact(string L1Id, string L2Id, string L3Id) : Geo
 }
 
 public sealed record ConjugateDirectionsFact(string Line1Id, string Line2Id, string ConicId) : GeoFact;
+/// <summary>
+/// 斜率积"定值"：k(Line1)·k(Line2) = Value。
+/// 【语义边界】这是**当前坐标系（轴对齐，M₀₁=0）下的显示性推论**，不是 Affine 不变量：
+///   仿射剪切或旋转都会让 M₀₁≠0 且斜率积改变；它也不随场景变换搬运（SceneTransfer 会丢弃）。
+///   共轭方向本身由 <see cref="ConjugateDirectionsFact"/> 表达（可搬运），本事实仅供解释/展示。
+/// </summary>
 public sealed record ConstantSlopeProductFact(string Line1Id, string Line2Id, ExactScalar Value) : GeoFact;
 
 /// <summary>两直线平行（不重合）。仿射不变量。</summary>

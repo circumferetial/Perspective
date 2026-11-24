@@ -48,7 +48,7 @@
 | 1 | 切点弦极线 | 两条切线、Q 在两线上 | `PolarOfFact(切点弦, Q)` | Projective | 切点必须在曲线上 |
 | 2 | La Hire 互反 | 两条极线、Q 在 P 的极线上 | `OnLineFact(P, Q的极线)` | Projective | 配极对称性 |
 | 3 | 极点极线调和束 | 极线、割线、割线与极线交点、两曲线交点 | `HarmonicFact` | Projective | 严格回验交比 |
-| 4 | 点差法中点斜率积 | 中心、中点、两点在曲线上 | `ConjugateDirectionsFact` / `ConstantSlopeProductFact` | Affine | 射影不保中点/斜率 |
+| 4 | 点差法中点斜率积 | 中心、中点、两点在曲线上 | `ConjugateDirectionsFact`（共轭，可搬运）/ `ConstantSlopeProductFact`（轴对齐坐标系显示性推论，**非**仿射不变量） | Affine（共轭）/ 固定轴向特例（斜率积） | 射影不保中点；斜率积仅在 M₀₁=0 的坐标系内成立，不做变换搬运 |
 | 5 | 极线基本定理 | 点在曲线上 + 其极线 | `TangentFact` | Projective | 曲线上点的极线即切线 |
 | 6 | 共轭直径平分弦 | 共轭方向、弦的两端在曲线上 | `MidpointFact` | Affine | |
 | 7 | 同线三点共线 | 三点在同一直线上 | `CollinearFact` | Projective | 平凡但补链 |

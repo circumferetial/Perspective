@@ -132,6 +132,46 @@ public class RuleGuardsTests
             ConicTools.IsProperPolarLine(circle, p, circle.PolarLine(p)));
     }
 
+    private static FactBase EllipseMidpointScene(Matrix3x3 transform)
+    {
+        var facts = new FactBase { CurrentLevel = TransformLevel.Affine };
+        var ellipse = Conic.Ellipse(F("2"), I(1));          // x²/4 + y² = 1（轴对齐）
+        var conic = transform.Transform(ellipse);
+
+        var a = transform * HPoint.FromCartesian(2, 0);
+        var b = transform * HPoint.FromCartesian(0, 1);
+        var m = transform * HPoint.FromCartesian(1, F("1/2"));
+        var o = transform * HPoint.FromCartesian(0, 0);
+
+        facts.AddConic("C", conic);
+        facts.AddPoint("A", a);
+        facts.AddPoint("B", b);
+        facts.AddPoint("M", m);
+        facts.AddPoint("O", o);
+        facts.AddFact(new CenterOfConicFact("O", "C"), "测试");
+        facts.AddFact(new MidpointFact("M", "A", "B"), "测试");
+        facts.AddFact(new OnConicFact("A", "C"), "测试");
+        facts.AddFact(new OnConicFact("B", "C"), "测试");
+        return facts;
+    }
+
+    [Fact]
+    public void SlopeProduct_IsOnlyEmittedInAxisAlignedFrame()
+    {
+        // 轴对齐：共轭 + 斜率积都生成
+        var aligned = EllipseMidpointScene(Matrix3x3.Identity);
+        ConicMidpointSlopeRule.Apply(aligned);
+        Assert.NotEmpty(aligned.ConjugateDirections);
+        Assert.NotEmpty(aligned.SlopeProducts);
+
+        // 旋转 30°：共轭仍成立（可搬运），但斜率积定值不再生成（M01≠0）
+        var rotation = Matrix3x3.Rotation(F("sqrt(3)/2"), F("1/2"));
+        var rotated = EllipseMidpointScene(rotation);
+        ConicMidpointSlopeRule.Apply(rotated);
+        Assert.NotEmpty(rotated.ConjugateDirections);
+        Assert.Empty(rotated.SlopeProducts);
+    }
+
     [Fact]
     public void PolarFundamentalRule_DoesNotProduceTangentFactForDegenerateConic()
     {

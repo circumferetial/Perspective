@@ -419,7 +419,8 @@ public readonly struct ConicMidpointSlopeRule : IFactRule<ConicMidpointSlopeRule
                         new OnConicFact(mid.BId, cen.ConicId)))
                     count++;
 
-                // 特例：无交叉项且斜率有限时，额外给出斜率积定值 −M₀₀/M₁₁
+                // 特例：无交叉项（轴对齐坐标系）且斜率有限时，额外给"当前坐标系下的显示性推论" −M₀₀/M₁₁。
+                // 注意：这不是 Affine 不变量——剪切/旋转会改变它；不要把它当可搬运的共轭结论。
                 if (m.M01.VerifyStrictZero() != StrictResult.StrictlyTrue) continue;
 
                 var k1 = facts.Lines[lineOM].TryGetSlope();
