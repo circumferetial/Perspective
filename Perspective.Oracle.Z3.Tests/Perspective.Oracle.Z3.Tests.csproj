@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Perspective.Core\Perspective.Core.csproj" />
+    <ProjectReference Include="..\Perspective.Constraint\Perspective.Constraint.csproj" />
     <ProjectReference Include="..\Perspective.Oracle.Z3\Perspective.Oracle.Z3.csproj" />
   </ItemGroup>
 

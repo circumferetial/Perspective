@@ -224,5 +224,7 @@ SymPy（子进程 + JSON，`ISymbolicBackend`，零 native 构建）。
 其它红线：非等式片段（不等式、根式、分母含变量、超越）拒绝或转 Z3/证书层；
 可约约束不做因式分解时只覆盖 generic 分支；迭代/规模超限返回 `Unknown`。
 
-当前参考实现：`Perspective.Oracle.Z3.Z3EquationalProver`（用 Z3 做等式蕴含，验证契约与状态映射）。
-吴特征列后端后续以同一契约接入，并负责 NDG 的产出。
+当前实现：
+- `Perspective.Oracle.Z3.Z3EquationalProver`：参考后端（Z3 直接判定，用于验证契约与状态映射）；
+- `Perspective.Constraint.WuEquationalProver`：吴特征列后端（从实验分支原样移植 `Monomial`/`PolyExpr`/方程管线，薄适配 `RelationStatement` 解析）；伪除初始式作为 NDG 通过 `ProvedUnderAssumptions` 外显。
+两个后端对同一组等式系统做交叉校验：Wu 声称可证（含条件证明）时，Z3 必须也判 Proved。
