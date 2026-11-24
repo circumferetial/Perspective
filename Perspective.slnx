@@ -1,8 +1,8 @@
 <Solution>
   <Project Path="Perspective.Core/Perspective.Core.csproj" />
+  <Project Path="Perspective.Experiment/Perspective.Experiment.csproj" />
   <Project Path="Perspective.Oracle.Z3/Perspective.Oracle.Z3.csproj" />
   <Project Path="Perspective.Oracle.Z3.Tests/Perspective.Oracle.Z3.Tests.csproj" />
-  <Project Path="Perspective.Sandbox/Perspective.Sandbox.csproj" />
   <Project Path="Perspective.Sympy/Perspective.Sympy.csproj" />
   <Project Path="Perspective.Sympy.Tests/Perspective.Sympy.Tests.csproj" />
   <Project Path="Perspective.Tests/Perspective.Tests.csproj" />
