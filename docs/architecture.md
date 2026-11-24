@@ -206,3 +206,23 @@ SymPy（子进程 + JSON，`ISymbolicBackend`，零 native 构建）。
 3. 规则的前提是否都能严通道回验？不能回验的前提要显式注明"trusted"。
 4. 是否有退化情形（重合点、无穷远点、相切、除零）？在注释里写明处理方式。
 5. 补一个正例 + 一个反例（伪造标签）验证，再提交。
+
+## 4k. 等式后端契约（E）
+
+**分工**：`IAlgebraicOracle` 判定"∃ 实解"（反例）；`IEquationalProver` 证明"generic 等式蕴含"。
+两者方向不同，不得互相替代。
+
+**状态映射（接线的 soundness 规则）**
+
+| 后端结果 | 语义 | 处理 |
+|---|---|---|
+| `Proved` | 假设下目标 ≡ 0，无附加假设 | 可记 `StrictlyTrue`，来源标后端 |
+| `ProvedUnderAssumptions` | 仅当列出的 NDG（多项式 ≠ 0）成立 | 条件证明；NDG 必须外显，不得静默当无条件真 |
+| `Unknown` | 未证（可能假、可能能力不足） | **永远不得当作假** |
+| `InconsistentHypotheses` | 假设集矛盾（空洞真） | 显式标记，不得静默当证明 |
+
+其它红线：非等式片段（不等式、根式、分母含变量、超越）拒绝或转 Z3/证书层；
+可约约束不做因式分解时只覆盖 generic 分支；迭代/规模超限返回 `Unknown`。
+
+当前参考实现：`Perspective.Oracle.Z3.Z3EquationalProver`（用 Z3 做等式蕴含，验证契约与状态映射）。
+吴特征列后端后续以同一契约接入，并负责 NDG 的产出。
