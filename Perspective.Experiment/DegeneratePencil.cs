@@ -45,7 +45,7 @@ public static class DegeneratePencil
 
         var lamVar = MathS.Var("lambda");
         var detEntity = det.Exact ?? throw new InvalidOperationException("det 缺少精确表达式");
-        Console.WriteLine($"  因式分解 = {MathS.Polynomials.Factor(detEntity, lamVar).Simplify()}");
+        Console.WriteLine($"  因式分解 = {MathS.Polynomials.Factor(detEntity, lamVar)!.Simplify()}");
         var rootSet = (IEnumerable<Entity>)MathS.SolveEquation(detEntity, lamVar);
         var roots = rootSet.ToList();
         Console.WriteLine($"  有限根 λ* = {string.Join(", ", roots.Select(r => r.ToString()))}" +
