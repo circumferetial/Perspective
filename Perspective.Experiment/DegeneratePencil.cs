@@ -44,8 +44,9 @@ public static class DegeneratePencil
         Console.WriteLine($"  det(C1 + λ·C2) = {det}");
 
         var lamVar = MathS.Var("lambda");
-        Console.WriteLine($"  因式分解 = {MathS.Polynomials.Factor(det.Exact!, lamVar).Simplify()}");
-        var rootSet = (IEnumerable<Entity>)MathS.SolveEquation(det.Exact!, lamVar);
+        var detEntity = det.Exact ?? throw new InvalidOperationException("det 缺少精确表达式");
+        Console.WriteLine($"  因式分解 = {MathS.Polynomials.Factor(detEntity, lamVar).Simplify()}");
+        var rootSet = (IEnumerable<Entity>)MathS.SolveEquation(detEntity, lamVar);
         var roots = rootSet.ToList();
         Console.WriteLine($"  有限根 λ* = {string.Join(", ", roots.Select(r => r.ToString()))}" +
                           "（λ=∞ 给出 C2 本身，也是退化成员）");
