@@ -1365,3 +1365,52 @@ public readonly struct SegmentRatioTransitivityRule : IFactRule<SegmentRatioTran
         return facts.AddDerivedFact(candidate, RuleIds.SegmentRatioTransitivity, first, second) ? 1 : 0;
     }
 }
+/// <summary>
+/// P2 实验规则：三线共点于无穷远线 ⇒ 两两平行（#12 平行传递的"基础设施版"）。
+/// 【前提】ConcurrentFact(L1,L2,L3)；严通道回验 L1∩L2 是无穷远点且 L3 也过它。
+/// 【结论】三对 ParallelFact（去重、严通道回验 AreParallel）。
+/// 【等级】Affine——"平行"依赖 l∞ 的存在。与 #12 相比不依赖传递链：对 n 条平行线通用。
+/// </summary>
+public readonly struct ConcurrentAtInfinityImpliesParallelRule : IFactRule<ConcurrentAtInfinityImpliesParallelRule>
+{
+    public static string Title => "共点于无穷远线 ⇒ 两两平行";
+    public static TransformLevel RequiredLevel => TransformLevel.Affine;
+    public static Type[] ConclusionTypes => [typeof(ParallelFact)];
+    public static Type[] PremiseTypes => [typeof(ConcurrentFact), typeof(OnLineFact)];
+
+    public static int Apply(FactBase facts)
+    {
+        int count = 0;
+        foreach (var concurrent in facts.Concurrents.ToList())
+        {
+            if (!facts.Lines.TryGetValue(concurrent.L1Id, out var l1) ||
+                !facts.Lines.TryGetValue(concurrent.L2Id, out var l2) ||
+                !facts.Lines.TryGetValue(concurrent.L3Id, out var l3)) continue;
+
+            var meeting = HLine.Intersect(l1, l2);
+            if (!meeting.IsAtInfinity) continue;
+            if (l3.ContainsStrictly(meeting) != StrictResult.StrictlyTrue) continue;
+
+            foreach (var (x, y) in new[]
+                     {
+                         (concurrent.L1Id, concurrent.L2Id),
+                         (concurrent.L1Id, concurrent.L3Id),
+                         (concurrent.L2Id, concurrent.L3Id)
+                     })
+            {
+                if (!facts.Lines.TryGetValue(x, out var lx) ||
+                    !facts.Lines.TryGetValue(y, out var ly)) continue;
+
+                if (LineTools.Same(lx, ly) == StrictResult.StrictlyTrue) continue;
+                if (GeometryAudit.AreParallel(lx, ly) != StrictResult.StrictlyTrue) continue;
+
+                if (facts.AddDerivedFact(
+                        ParallelFact.Create(x, y),
+                        RuleIds.ConcurrentAtInfinityImpliesParallel,
+                        concurrent))
+                    count++;
+            }
+        }
+        return count;
+    }
+}

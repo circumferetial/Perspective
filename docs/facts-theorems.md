@@ -63,7 +63,7 @@
 | 16 | 面积比传递 | 两条 `AreaRatioFact`（共享三角形） | `AreaRatioFact` | Affine | S₁/S₂·S₂/S₃ |
 | 17 | 线段比传递 | 两条 `SegmentRatioFact`（共享线段） | `SegmentRatioFact` | Similarity | 平方形式回验（无根号） |
 
-## 3. 已知缺口（按优先级）
+> **补充（P2 实验，尚未替换 #12）**：\ConcurrentAtInfinityImpliesParallelRule\（Affine）——三线共点于无穷远线 ⇒ 两两平行，\n> 用 \l∞\ 上的方向点统一表达平行，不依赖传递链；对 n 条平行线通用。方向点去重（\SameStrictly\）与 l∞ 惰性登记待完善。\n\n## 3. 已知缺口（按优先级）
 
 > 说明：比例/角度/平行/垂直事实已补齐（P1-4）。当前主要缺口是"长尾定值组合"的
 > 通用载体（已由 `AlgebraicRelationFact` 覆盖终端情形）与跨模型定理搬运。

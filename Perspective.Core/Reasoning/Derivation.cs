@@ -59,4 +59,7 @@ public static class RuleIds
     public const string AreaRatioTransitivity = "area-ratio-transitivity";
 
     public const string SegmentRatioTransitivity = "segment-ratio-transitivity";
+
+    /// <summary>P2 实验：共点于无穷远线 ⇒ 两两平行（替代 #12 的传递写法）。</summary>
+    public const string ConcurrentAtInfinityImpliesParallel = "concurrent-at-infinity-implies-parallel";
 }
