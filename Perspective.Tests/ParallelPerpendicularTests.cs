@@ -46,17 +46,40 @@ public class ParallelPerpendicularTests
     }
 
     [Fact]
-    public void ParallelTransitivity_DerivesThirdParallel()
+    public void ParallelTransitivity_DerivesThirdParallel_ThroughInfinityPoint()
     {
         var facts = LineScene();
         facts.AddFact(ParallelFact.Create("L1", "L2"), "初始");
         facts.AddFact(ParallelFact.Create("L2", "L3"), "初始");
 
-        new TheoremEngine().Register<ParallelTransitivityRule>().RunToFixedPoint(facts);
+        new TheoremEngine()
+            .Register<ParallelImpliesSharedInfinityPointRule>()
+            .Register<ConcurrentFromCommonPointRule>()
+            .Register<ConcurrentAtInfinityImpliesParallelRule>()
+            .RunToFixedPoint(facts);
 
         Assert.Contains(facts.Parallels, f => f == ParallelFact.Create("L1", "L3"));
-        // 前提顺序无关：结论已规范化
-        Assert.Contains(facts.DerivationLog, d => d.RuleId == RuleIds.ParallelTransitivity);
+        // 传递结论来自 l∞ 方向点 + 共点桥，而不是旧的传递规则
+        Assert.Contains(facts.DerivationLog, d => d.RuleId == RuleIds.ConcurrentAtInfinityImpliesParallel);
+        Assert.DoesNotContain(facts.DerivationLog, d => d.RuleId == RuleIds.ParallelTransitivity);
+    }
+
+    [Fact]
+    public void MixedParallelAndCrossingLines_DoNotCreateFalseParallels()
+    {
+        var facts = LineScene();
+        facts.AddFact(ParallelFact.Create("L1", "L2"), "初始");
+
+        new TheoremEngine()
+            .Register<ParallelImpliesSharedInfinityPointRule>()
+            .Register<ConcurrentFromCommonPointRule>()
+            .Register<ConcurrentAtInfinityImpliesParallelRule>()
+            .RunToFixedPoint(facts);
+
+        // V 与 L1/L2 相交于有限点；不应被并进"方向点共点"
+        Assert.Single(facts.Parallels);
+        Assert.DoesNotContain(facts.Parallels, p =>
+            p == ParallelFact.Create("V", "L1") || p == ParallelFact.Create("V", "L2"));
     }
 
     [Fact]

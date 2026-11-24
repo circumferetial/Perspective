@@ -41,7 +41,7 @@
 **终端专用事实**：`AlgebraicRelationFact` 只用于表达"某表达式为定值/等于另一表达式"这类
 长尾结论，不进入组合型规则的候选枚举（防爆炸）；新增其它终端事实时也应遵守这条。
 
-## 2. 定理规则（当前 17 条）
+## 2. 定理规则（原 17 条；#6、#12 已退役，另有 5 条 P2/P3 补充规则见下方注记）
 
 | # | 规则 | 前提 | 结论 | 等级 | 说明 |
 |---|---|---|---|---|---|
@@ -56,7 +56,7 @@
 | 9 | Pascal | 六点内接同一非退化曲线 | `CollinearFact`（对边交点） | Projective | 组合型，有成本闸 |
 | 10 | 完全四点形调和性 | 四点为一般位置 | 6 条 `HarmonicFact` | Projective | 组合型，有成本闸 |
 | 11 | Brianchon | 六条切线切同一非退化曲线 | `ConcurrentFact`（主对角线） | Projective | Pascal 对偶 |
-| 12 | 平行传递 | 两条 `ParallelFact` | `ParallelFact` | Affine | 三线互异 + 严通道回验 |
+| 12 | ~~平行传递~~ | — | `ParallelFact` | Affine | **已退役**：改由 `ParallelImpliesSharedInfinityPointRule` + `ConcurrentAtInfinityImpliesParallelRule`（l∞ 方向点 + #8 共点）推导，对 n 条平行线通用 |
 | 13 | 垂直与平行相容 | `PerpendicularFact` + `ParallelFact` | `PerpendicularFact` | Similarity | 垂直非仿射不变量 |
 | 14 | 平行线的对应角相等 | `ParallelFact` | `AngleEqualFact` | Similarity | θ(L₁,M) ≡ θ(L₂,M) |
 | 15 | 角相等传递 | 两条 `AngleEqualFact`（共享线对） | `AngleEqualFact` | Similarity | 符号相乘：s₁·s₂ |

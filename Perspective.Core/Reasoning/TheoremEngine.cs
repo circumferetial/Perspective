@@ -1003,45 +1003,6 @@ public readonly struct ConcurrentFromCommonPointRule : IFactRule<ConcurrentFromC
 }
 
 /// <summary>
-/// 命题 12：平行传递（L₁∥L₂ 且 L₂∥L₃ ⇒ L₁∥L₃，三线互异）。
-/// 【前提】两条 ParallelFact；严通道回验三线互不重合且确实平行（不信标签）。
-/// 【结论】ParallelFact(L₁, L₃)。
-/// 【等级】Affine——平行是仿射不变量。
-/// </summary>
-public readonly struct ParallelTransitivityRule : IFactRule<ParallelTransitivityRule>
-{
-    public static string Title => "平行传递";
-    public static TransformLevel RequiredLevel => TransformLevel.Affine;
-    public static Type[] ConclusionTypes => [typeof(ParallelFact)];
-    public static Type[] PremiseTypes => [typeof(ParallelFact)];
-
-    public static int Apply(FactBase facts)
-    {
-        int count = 0;
-        foreach (var first in facts.Parallels.ToList())
-        {
-            foreach (var thirdId in facts.LinesParallelTo(first.Line2Id).ToList())
-            {
-                if (thirdId == first.Line1Id) continue;
-                if (!facts.Lines.TryGetValue(first.Line1Id, out var a) ||
-                    !facts.Lines.TryGetValue(thirdId, out var b)) continue;
-
-                if (LineTools.Same(a, b) == StrictResult.StrictlyTrue) continue;
-                if (GeometryAudit.AreParallel(a, b) != StrictResult.StrictlyTrue) continue;
-
-                var second = ParallelFact.Create(first.Line2Id, thirdId);
-                if (facts.AddDerivedFact(
-                        ParallelFact.Create(first.Line1Id, thirdId),
-                        RuleIds.ParallelTransitivity,
-                        first, second))
-                    count++;
-            }
-        }
-        return count;
-    }
-}
-
-/// <summary>
 /// 命题 13：垂直与平行相容（L₁⊥L₂ 且 L₃∥L₂ ⇒ L₁⊥L₃；对称地 L₃∥L₁ ⇒ L₃⊥L₂）。
 /// 【前提】PerpendicularFact + ParallelFact；严通道回验两线互异且确实垂直。
 /// 【结论】PerpendicularFact。
