@@ -158,17 +158,15 @@ public class RuleGuardsTests
     [Fact]
     public void SlopeProduct_IsOnlyEmittedInAxisAlignedFrame()
     {
-        // 轴对齐：共轭 + 斜率积都生成
+        // 轴对齐：斜率积显示性推论生成
         var aligned = EllipseMidpointScene(Matrix3x3.Identity);
         ConicMidpointSlopeRule.Apply(aligned);
-        Assert.NotEmpty(aligned.ConjugateDirections);
         Assert.NotEmpty(aligned.SlopeProducts);
 
-        // 旋转 30°：共轭仍成立（可搬运），但斜率积定值不再生成（M01≠0）
+        // 旋转 30°：斜率积定值不再生成（M01≠0）
         var rotation = Matrix3x3.Rotation(F("sqrt(3)/2"), F("1/2"));
         var rotated = EllipseMidpointScene(rotation);
         ConicMidpointSlopeRule.Apply(rotated);
-        Assert.NotEmpty(rotated.ConjugateDirections);
         Assert.Empty(rotated.SlopeProducts);
     }
 

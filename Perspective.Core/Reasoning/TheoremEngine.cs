@@ -338,7 +338,7 @@ public readonly struct HarmonicPolarBundleRule : IFactRule<HarmonicPolarBundleRu
 }
 
 /// <summary>
-/// 命题 4：有心圆锥曲线点差法（仅 Affine 及以上视角有效！切到 Projective 自动屏蔽）
+/// 命题 4（收窄版）：有心圆锥曲线的"轴对齐斜率积显示性推论"。
 /// 【前提】① 有心非退化（δ = M₀₀M₁₁ − M₀₁² ≠ 0 且 Δ = det C ≠ 0；抛物线无有限中心、
 ///         退化曲线不适用，由 ConicTools.Classify 判定）；② M 严格为 AB 中点
 ///         （IsMidpoint 回验）；③ A、B 严格在曲线上（ContainsStrictly 回验）；
@@ -359,7 +359,7 @@ public readonly struct ConicMidpointSlopeRule : IFactRule<ConicMidpointSlopeRule
 {
     public static string Title => "点差法中点斜率积定理";
     public static TransformLevel RequiredLevel => TransformLevel.Affine;
-    public static Type[] ConclusionTypes => [typeof(ConjugateDirectionsFact), typeof(ConstantSlopeProductFact)];
+    public static Type[] ConclusionTypes => [typeof(ConstantSlopeProductFact)];
     public static Type[] PremiseTypes => [typeof(CenterOfConicFact), typeof(MidpointFact), typeof(OnConicFact)]; // 射影视角不保中点与斜率积！
 
     public static int Apply(FactBase facts)
@@ -411,15 +411,7 @@ public readonly struct ConicMidpointSlopeRule : IFactRule<ConicMidpointSlopeRule
 
                 if (conj.VerifyStrictZero() != StrictResult.StrictlyTrue) continue;
 
-                if (facts.AddDerivedFact(
-                        new ConjugateDirectionsFact(lineOM, lineAB, cen.ConicId),
-                        RuleIds.ConicMidpointSlope,
-                        cen, mid,
-                        new OnConicFact(mid.AId, cen.ConicId),
-                        new OnConicFact(mid.BId, cen.ConicId)))
-                    count++;
-
-                // 特例：无交叉项（轴对齐坐标系）且斜率有限时，额外给"当前坐标系下的显示性推论" −M₀₀/M₁₁。
+                                // 特例：无交叉项（轴对齐坐标系）且斜率有限时，额外给"当前坐标系下的显示性推论" −M₀₀/M₁₁。
                 // 注意：这不是 Affine 不变量——剪切/旋转会改变它；不要把它当可搬运的共轭结论。
                 if (m.M01.VerifyStrictZero() != StrictResult.StrictlyTrue) continue;
 
@@ -1515,6 +1507,64 @@ public readonly struct ConicChordPolarHarmonicRule : IFactRule<ConicChordPolarHa
                         new OnConicFact(bId, conicId),
                         new OnLineFact(aId, lineId),
                         new OnLineFact(bId, lineId)))
+                    count++;
+            }
+        }
+        return count;
+    }
+}
+/// <summary>
+/// P3 收尾：#4 共轭部分的替代产出——弦方向点的极线就是共轭直径。
+/// 【前提】非退化圆锥曲线 C；弦 AB（A、B 是 C 与直线 L 上的已登记点）。
+/// 【结论】ConjugateDirectionsFact(极线, L, C)：弦方向与极线方向共轭。
+/// 【推导】D∞ = L ∩ l∞ 是弦方向点；C·D∞ 是 D∞ 的极线，即该方向的共轭直径；
+///         对有心曲线它过中心，对抛物线它是平行于轴的直径——所以不需要 CenterOfConicFact。
+/// 【等级】Affine。
+/// </summary>
+public readonly struct ConicChordPolarConjugateRule : IFactRule<ConicChordPolarConjugateRule>
+{
+    public static string Title => "弦方向点极线 ⇒ 共轭方向";
+    public static TransformLevel RequiredLevel => TransformLevel.Affine;
+    public static Type[] ConclusionTypes => [typeof(ConjugateDirectionsFact)];
+    public static Type[] PremiseTypes => [typeof(OnConicFact), typeof(OnLineFact)];
+
+    public static int Apply(FactBase facts)
+    {
+        int count = 0;
+        foreach (var (conicId, conic) in facts.Conics)
+        {
+            if (conic.Matrix.Determinant().VerifyStrictZero() != StrictResult.StrictlyFalse)
+                continue;
+
+            foreach (var lineId in facts.LineIdsWithPoints.ToList())
+            {
+                if (!facts.Lines.TryGetValue(lineId, out var chord)) continue;
+
+                var onChord = facts.PointsOn(lineId)
+                    .Where(pid => facts.HasOnConic(pid, conicId))
+                    .Distinct()
+                    .ToList();
+                if (onChord.Count != 2) continue;
+
+                var infinityLineId = facts.GetOrCreateInfinityLine();
+                var direction = HLine.Intersect(chord, facts.Lines[infinityLineId]);
+                if (!direction.IsAtInfinity) continue;
+
+                var polar = conic.PolarLine(direction);
+                var zero = (polar.A.VerifyStrictZero() == StrictResult.StrictlyTrue)
+                        && (polar.B.VerifyStrictZero() == StrictResult.StrictlyTrue)
+                        && (polar.C.VerifyStrictZero() == StrictResult.StrictlyTrue);
+                if (zero) continue;
+
+                var polarId = facts.GetOrCreateLine(polar);
+
+                if (facts.AddDerivedFact(
+                        new ConjugateDirectionsFact(polarId, lineId, conicId),
+                        RuleIds.ConicChordPolarConjugate,
+                        new OnConicFact(onChord[0], conicId),
+                        new OnConicFact(onChord[1], conicId),
+                        new OnLineFact(onChord[0], lineId),
+                        new OnLineFact(onChord[1], lineId)))
                     count++;
             }
         }

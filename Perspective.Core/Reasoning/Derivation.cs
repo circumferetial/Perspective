@@ -71,4 +71,7 @@ public static class RuleIds
 
     /// <summary>P3b：圆锥曲线弦的"方向点极线"给出调和共轭（点差法/共轭直径的射影化）。</summary>
     public const string ConicChordPolarHarmonic = "conic-chord-polar-harmonic";
+
+    /// <summary>P3 收尾：弦方向点的极线给出共轭方向（#4 共轭部分的替代产出）。</summary>
+    public const string ConicChordPolarConjugate = "conic-chord-polar-conjugate";
 }

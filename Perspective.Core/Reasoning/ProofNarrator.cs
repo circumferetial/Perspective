@@ -24,6 +24,7 @@ public static class ProofNarrator
         RuleIds.ConicMidpointSlope => RenderMidpointSlope(derivation),
         RuleIds.PolarFundamental => RenderPolarFundamental(derivation),
         RuleIds.ConjugateDiameterBisectsChord => RenderConjugateDiameter(derivation),
+        RuleIds.ConicChordPolarConjugate => RenderConjugateFromPolar(derivation),
         RuleIds.ConcurrentFromCommonPoint => RenderConcurrent(derivation),
         RuleIds.CompleteQuadrangleHarmonic => RenderQuadrangle(derivation),
         RuleIds.Brianchon => RenderBrianchon(derivation),
@@ -122,6 +123,12 @@ public static class ProofNarrator
         if (conj is null) return Fallback(d);
 
         return $"弦 {midpoint.AId}{midpoint.BId} 与直径 {conj.Line1Id} 共轭，其交点 {midpoint.MidId} 即为该弦的中点";
+    }
+
+    private static string RenderConjugateFromPolar(Derivation d)
+    {
+        if (d.Fact is not ConjugateDirectionsFact conj) return Fallback(d);
+        return $"由配极：弦方向点的极线 {conj.Line1Id} 与弦 {conj.Line2Id} 关于曲线 {conj.ConicId} 共轭";
     }
 
     private static string RenderConcurrent(Derivation d)

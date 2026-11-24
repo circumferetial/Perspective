@@ -519,6 +519,23 @@ public sealed class FactBase
     }
 
     /// <summary>
+    /// 按 <see cref="LineTools.Same"/> 严格去重登记一条直线（用于辅助直线、极线等）。
+    /// 与 <see cref="GetOrCreateLine(string,string)"/> 的区别：后者由两点构造并记录 OnLine 事实。
+    /// </summary>
+    public string GetOrCreateLine(HLine line)
+    {
+        foreach (var (id, existing) in Lines)
+            if (LineTools.Same(existing, line) == StrictResult.StrictlyTrue)
+                return id;
+
+        string newId;
+        var k = 0;
+        do { newId = $"Lx{k++}"; } while (Lines.ContainsKey(newId));
+        Lines[newId] = line;
+        return newId;
+    }
+
+    /// <summary>
     /// 登记/复用一般点（含由构造产生的辅助点）：按 SameStrictly 严格去重。
     /// 与 <see cref="GetOrCreatePointAtInfinity"/> 分开：这里允许任何有限点。
     /// </summary>

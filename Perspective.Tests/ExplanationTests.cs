@@ -141,9 +141,18 @@ public class ExplanationTests
         facts.AddFact(new OnConicFact("B", "E"), "初始");
         facts.AddFact(new MidpointFact("M", "A", "B"), "初始");
 
-        new TheoremEngine().Register<ConicMidpointSlopeRule>().RunToFixedPoint(facts);
+        // 共轭方向由 P3 规则产出（弦方向点的极线），旧 #4 只保留轴对齐斜率积
+        facts.AddLine("AB", HLine.FromPoints(a, b));
+        facts.AddFact(new OnLineFact("A", "AB"), "初始");
+        facts.AddFact(new OnLineFact("B", "AB"), "初始");
 
-        var conj = facts.DerivationLog.Single(x => x.RuleId == RuleIds.ConicMidpointSlope && x.Fact is ConjugateDirectionsFact);
+        new TheoremEngine()
+            .Register<ConicMidpointSlopeRule>()
+            .Register<ConicChordPolarConjugateRule>()
+            .RunToFixedPoint(facts);
+
+        var conj = facts.DerivationLog.Single(x =>
+            x.RuleId == RuleIds.ConicChordPolarConjugate && x.Fact is ConjugateDirectionsFact);
         Assert.Null(conj.Note);
         Assert.Contains("共轭", ProofNarrator.Render(facts, conj));
 
