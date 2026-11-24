@@ -244,9 +244,9 @@ public readonly struct PolePolarReciprocityRule : IFactRule<PolePolarReciprocity
                 // 前提严通道回验：确认两条线确实分别是两极点的极线（不信任 PolarOfFact 标签）。
                 // 判据收敛在 ConicTools.IsPolarLine（与裁决器共用，避免两处实现漂移）。
                 var conic = facts.Conics[pFact.ConicId];
-                if (ConicTools.IsPolarLine(conic, facts.Points[pFact.PoleId], facts.Lines[pFact.LineId])
+                if (ConicTools.IsProperPolarLine(conic, facts.Points[pFact.PoleId], facts.Lines[pFact.LineId])
                     != StrictResult.StrictlyTrue) continue;
-                if (ConicTools.IsPolarLine(conic, facts.Points[qFact.PoleId], facts.Lines[qFact.LineId])
+                if (ConicTools.IsProperPolarLine(conic, facts.Points[qFact.PoleId], facts.Lines[qFact.LineId])
                     != StrictResult.StrictlyTrue) continue;
 
                 // 严通道验真：L_Q 真的严格经过 P
@@ -473,7 +473,7 @@ public readonly struct PolarFundamentalRule : IFactRule<PolarFundamentalRule>
             var pole = facts.Points[polar.PoleId];
 
             if (conic.ContainsStrictly(pole) != StrictResult.StrictlyTrue) continue;
-            if (ConicTools.IsPolarLine(conic, pole, facts.Lines[polar.LineId]) != StrictResult.StrictlyTrue) continue;
+            if (ConicTools.IsProperPolarLine(conic, pole, facts.Lines[polar.LineId]) != StrictResult.StrictlyTrue) continue;
 
             if (facts.AddDerivedFact(
                     new TangentFact(polar.LineId, polar.ConicId, polar.PoleId),
@@ -998,6 +998,11 @@ public readonly struct CollinearFromCommonLineRule : IFactRule<CollinearFromComm
                 if (!facts.Points.TryGetValue(pts[i], out var a) ||
                     !facts.Points.TryGetValue(pts[j], out var b) ||
                     !facts.Points.TryGetValue(pts[k], out var c)) continue;
+
+                // 三点坐标必须两两互异（id 不同但坐标重合时，"三点共线"是退化命题，不能入库）
+                if (PointTools.SameStrictly(a, b) == StrictResult.StrictlyTrue ||
+                    PointTools.SameStrictly(a, c) == StrictResult.StrictlyTrue ||
+                    PointTools.SameStrictly(b, c) == StrictResult.StrictlyTrue) continue;
 
                 // 严通道回验：坐标确实共线
                 if (PointTools.Collinear(a, b, c) != StrictResult.StrictlyTrue) continue;

@@ -1,3 +1,4 @@
+using AngouriMath;
 using Perspective.Core.Math;
 
 namespace Perspective.Core.Geometry;
@@ -111,11 +112,31 @@ public static class GeometryAudit
     public static StrictResult IsSegmentRatio(
         HPoint a1, HPoint a2, HPoint b1, HPoint b2, ExactScalar value)
     {
+        // 无穷远点没有欧氏长度（DistanceSquared 会除零），必须先拦，不能抛异常。
+        if (a1.IsAtInfinity || a2.IsAtInfinity || b1.IsAtInfinity || b2.IsAtInfinity)
+            return StrictResult.StrictlyFalse;
+
+        // 线段比非负；只在"确定是负常数"时拒绝，符号未定的符号参数不误杀。
+        if (IsCertainlyNegative(value) == StrictResult.StrictlyTrue)
+            return StrictResult.StrictlyFalse;
+
         var squared1 = Metric.DistanceSquared(a1, a2);
         var squared2 = Metric.DistanceSquared(b1, b2);
 
         if (squared2.VerifyStrictZero() == StrictResult.StrictlyTrue) return StrictResult.StrictlyFalse;
         return (squared1 - value * value * squared2).VerifyStrictZero();
+    }
+
+    /// <summary>value 是否"确定是负数"：纯近似或数值常数按符号判；符号表达式未定时返回 NearZeroUnproven（不拒绝）。</summary>
+    private static StrictResult IsCertainlyNegative(ExactScalar value)
+    {
+        if (value.Exact is null)
+            return value.Approx < 0 ? StrictResult.StrictlyTrue : StrictResult.StrictlyFalse;
+
+        if (value.Exact.Simplify() is Entity.Number)
+            return value.Approx < 0 ? StrictResult.StrictlyTrue : StrictResult.StrictlyFalse;
+
+        return StrictResult.NearZeroUnproven;
     }
 
     /// <summary>严格检验交比：(A,B;C,D) = value（射影不变量）。</summary>
@@ -130,6 +151,14 @@ public static class GeometryAudit
     /// </summary>
     public static StrictResult AreAngleEqual(HLine a1, HLine a2, HLine b1, HLine b2, int sign)
     {
+        // 退化直线（A=B=0：无穷远线或零直线）没有方向向量，任何角都无从谈起。
+        foreach (var line in new[] { a1, a2, b1, b2 })
+        {
+            var degeneracy = DegenerateDirection(line);
+            if (degeneracy == StrictResult.StrictlyTrue) return StrictResult.StrictlyFalse;
+            if (degeneracy == StrictResult.NoSymbolicData) return StrictResult.NoSymbolicData;
+        }
+
         static (ExactScalar Cross, ExactScalar Dot) TanPair(HLine x, HLine y)
         {
             var (x1, x2) = (-x.B, x.A);   // 方向向量 (−B, A)
@@ -140,6 +169,17 @@ public static class GeometryAudit
         var (crossA, dotA) = TanPair(a1, a2);
         var (crossB, dotB) = TanPair(b1, b2);
         return (crossA * dotB - sign * crossB * dotA).VerifyStrictZero();
+    }
+
+    /// <summary>直线方向向量 (−B, A) 是否确定为零：两个分量的严判零联合。</summary>
+    private static StrictResult DegenerateDirection(HLine line)
+    {
+        var az = line.A.VerifyStrictZero();
+        var bz = line.B.VerifyStrictZero();
+
+        if (az == StrictResult.StrictlyTrue && bz == StrictResult.StrictlyTrue) return StrictResult.StrictlyTrue;
+        if (az == StrictResult.NoSymbolicData || bz == StrictResult.NoSymbolicData) return StrictResult.NoSymbolicData;
+        return StrictResult.StrictlyFalse;
     }
 
     /// <summary>严格检验共线四点是否构成调和点列：交比 (A, B; C, D) == -1</summary>

@@ -89,7 +89,7 @@ public static class SceneTransfer
                 return facts.Conics.TryGetValue(f.ConicId, out var conic3) &&
                        facts.Lines.TryGetValue(f.LineId, out var line3) &&
                        facts.Points.TryGetValue(f.PoleId, out var pole) &&
-                       ConicTools.IsPolarLine(conic3, pole, line3) == StrictResult.StrictlyTrue;
+                       ConicTools.IsProperPolarLine(conic3, pole, line3) == StrictResult.StrictlyTrue;
 
             case MidpointFact f:
                 return facts.Points.TryGetValue(f.MidId, out var mid) &&
