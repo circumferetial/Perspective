@@ -12,5 +12,6 @@ public enum ConicKind
     IntersectingLines,
     ParallelLines,
     CoincidentLines,
-    Degenerate
+    Degenerate,
+    Unknown
 }

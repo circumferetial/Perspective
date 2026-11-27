@@ -37,14 +37,17 @@ public static class ConicFeatures
         var k = -q.Q12 / q.Q11;
         var center = new Primal3<ExactScalar>(h, k, ExactScalar.One);
         var constant = -q.Eval(center);
-        if (Sign(constant) == 0)
+
+        if (ExactScalar.TrySign(constant, out var sc) != StrictVerdict.StrictlyTrue)
+            return Result<ConicFoci, GeometryError>.Fail(GeometryError.UndefinedParameter);
+        if (sc == 0)
             return Result<ConicFoci, GeometryError>.Fail(GeometryError.DegenerateLine);
 
         var a = q.Q00;
         var b = q.Q11;
-        var sa = Sign(a);
-        var sb = Sign(b);
-        var sc = Sign(constant);
+        if (ExactScalar.TrySign(a, out var sa) != StrictVerdict.StrictlyTrue
+            || ExactScalar.TrySign(b, out var sb) != StrictVerdict.StrictlyTrue)
+            return Result<ConicFoci, GeometryError>.Fail(GeometryError.UndefinedParameter);
 
         var isCircle = ExactScalar.AreStrictlyEqual(a, b) == StrictResult.StrictlyTrue;
         if (sa == sb)
@@ -195,11 +198,5 @@ public static class ConicFeatures
         var focus2 = new Primal3<ExactScalar>(hh, kk + pp, ExactScalar.One);
         return Result<ConicFoci, GeometryError>.Ok(new ConicFoci(
             ConicKind.Parabola, vertex2, focus2, focus2, ExactScalar.One));
-    }
-
-    private static int Sign(ExactScalar x)
-    {
-        if (x.VerifyStrictZero() == StrictResult.StrictlyTrue) return 0;
-        return x.Approx >= 0 ? 1 : -1;
     }
 }

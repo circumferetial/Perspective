@@ -840,11 +840,14 @@ public static class ExactGeometryOps
                   - q.Q01 * (q.Q01 * q.Q22 - q.Q12 * q.Q02)
                   + q.Q02 * (q.Q01 * q.Q12 - q.Q11 * q.Q02);
         var delta = q.Q00 * q.Q11 - q.Q01 * q.Q01;
-        var ds = Sign(delta);
-        var dt = Sign(det);
+
+        if (ExactScalar.TrySign(delta, out var ds) != StrictVerdict.StrictlyTrue
+            || ExactScalar.TrySign(det, out var dt) != StrictVerdict.StrictlyTrue
+            || ExactScalar.TrySign(q.Q00 + q.Q11, out var traceSign) != StrictVerdict.StrictlyTrue)
+            return ConicKind.Unknown;
 
         // det(Q) 是三次型：Q ↦ −Q 会翻符号。实/虚的符号不变量要再乘 Sign(Q00+Q11)。
-        var realSign = Sign(q.Q00 + q.Q11) * dt;
+        var realSign = traceSign * dt;
 
         if (q.IsCircle())
             return realSign < 0 ? ConicKind.Circle
@@ -865,13 +868,6 @@ public static class ExactGeometryOps
         return dt == 0 ? ConicKind.IntersectingLines : ConicKind.Hyperbola;
     }
 
-    private static int Sign(ExactScalar x)
-    {
-        if (x.VerifyStrictZero(allowFastNumericReject: false) == StrictResult.StrictlyTrue)
-            return 0;
-        return x.Approx >= 0 ? 1 : -1;
-    }
-
     private static bool IsRankOne(BilinearForm3<ExactScalar> q)
     {
         var minors = new[]
@@ -885,7 +881,11 @@ public static class ExactGeometryOps
         };
 
         foreach (var minor in minors)
-            if (Sign(minor) != 0) return false;
+        {
+            if (ExactScalar.TrySign(minor, out var sign) != StrictVerdict.StrictlyTrue)
+                return false;
+            if (sign != 0) return false;
+        }
         return true;
     }
 }

@@ -14,6 +14,34 @@ public class SubspaceTests
     private static StrictVerdict TryInverseOf<T>(T value, out T inverse)
         where T : IComputableField<T> => T.TryInverse(value, out inverse);
 
+    private static StrictVerdict TrySignOf<T>(T value, out int sign)
+        where T : IOrderedRing<T> => T.TrySign(value, out sign);
+
+    private static StrictVerdict TrySqrtOf<T>(T value, out T root)
+        where T : ISqrtable<T> => T.TrySqrt(value, out root);
+
+    [Fact]
+    public void ExactScalar_TrySign_And_TrySqrt_AreTriState()
+    {
+        Assert.Equal(StrictVerdict.Unknown,
+            TrySignOf(ExactScalar.FromSymbol("x"), out _));
+        Assert.Equal(StrictVerdict.NoSymbolicData,
+            TrySignOf(ExactScalar.FromApprox(1), out _));
+
+        Assert.Equal(StrictVerdict.StrictlyTrue, TrySignOf(S(-2), out var negative));
+        Assert.Equal(-1, negative);
+        Assert.Equal(StrictVerdict.StrictlyTrue, TrySignOf(S(3), out var positive));
+        Assert.Equal(1, positive);
+        Assert.Equal(StrictVerdict.StrictlyTrue, TrySignOf(S(0), out var zero));
+        Assert.Equal(0, zero);
+
+        Assert.Equal(StrictVerdict.StrictlyFalse, TrySqrtOf(S(-1), out _));
+        Assert.Equal(StrictVerdict.StrictlyTrue, TrySqrtOf(S(4), out var root));
+        AssertZero(root * root - S(4));
+        Assert.Equal(StrictVerdict.NoSymbolicData,
+            TrySqrtOf(ExactScalar.FromApprox(4), out _));
+    }
+
     private static void AssertFromLongLaws<T>(Func<long, T> fromLong) where T : IExactRing<T>
     {
         Assert.Equal(StrictResult.StrictlyTrue, T.VerifyZero(fromLong(0) - T.Zero));
@@ -29,6 +57,9 @@ public class SubspaceTests
 
     private static void AssertZero<T>(T value) where T : IExactRing<T> =>
         Assert.Equal(StrictResult.StrictlyTrue, T.VerifyZero(value));
+
+    private static StrictResult VerifyZeroOf<T>(T value) where T : IExactRing<T> =>
+        T.VerifyZero(value);
 
     /// <summary>随机测试只能找反例，不能证明定律；这里用固定种子锁回归。</summary>
     private static void AssertRingLaws<T>(Func<Random, T> next, int iterations = 25)
@@ -1302,6 +1333,14 @@ public class SubspaceTests
                 == StrictResult.StrictlyTrue
             || SubspaceAlgebra.Pair(ed[1], Primal3<ExactScalar>.Fixed(-4, 0)).VerifyStrictZero()
                 == StrictResult.StrictlyTrue);
+    }
+
+    [Fact]
+    public void PolyExpr_ApproxTiny_IsNotStrictZero()
+    {
+        var tiny = PolyExpr.FromConst(ExactScalar.FromApprox(1e-12));
+        Assert.False(tiny.IsZero);
+        Assert.Equal(StrictResult.NoSymbolicData, VerifyZeroOf(tiny));
     }
 
     [Fact]

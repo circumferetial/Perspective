@@ -106,8 +106,8 @@ public interface IComputableField<T> : IIntegralDomain<T>, IMultiplicativeGroup<
 /// <summary>可判定符号的环：只要求三态符号，不要求全序/可计算比较。</summary>
 public interface IOrderedRing<T> : IExactRing<T> where T : IOrderedRing<T>
 {
-    /// <summary>-1 / 0 / +1；返回 0 必须已有零证明。</summary>
-    static abstract int Sign(T value);
+    /// <summary>-1 / 0 / +1；StrictlyTrue 才表示符号已证明。</summary>
+    static abstract StrictVerdict TrySign(T value, out int sign);
 }
 
 /// <summary>可计算域 + 符号，组合成“实域”语义。</summary>
@@ -209,22 +209,54 @@ public readonly record struct ExactScalar(double Approx, Entity? Exact) : IExact
         }
     }
 
-    static int IOrderedRing<ExactScalar>.Sign(ExactScalar value)
+    static StrictVerdict IOrderedRing<ExactScalar>.TrySign(ExactScalar value, out int sign) =>
+        TrySign(value, out sign);
+
+    /// <summary>sound 三态符号：只有精确零或数值常量才给出确定符号。</summary>
+    public static StrictVerdict TrySign(ExactScalar value, out int sign)
     {
-        if (value.VerifyStrictZero() == StrictResult.StrictlyTrue) return 0;
-        return value.Approx >= 0 ? 1 : -1;
+        if (value.VerifyStrictZero() == StrictResult.StrictlyTrue)
+        {
+            sign = 0;
+            return StrictVerdict.StrictlyTrue;
+        }
+
+        if (value.Exact is null)
+        {
+            sign = 0;
+            return StrictVerdict.NoSymbolicData;
+        }
+
+        var exact = value.Exact.Simplify();
+        if (exact.FreeVariables.Count != 0)
+        {
+            sign = 0;
+            return StrictVerdict.Unknown;
+        }
+
+        var numeric = (double)exact.EvalNumerical();
+        if (!double.IsFinite(numeric))
+        {
+            sign = 0;
+            return StrictVerdict.Unknown;
+        }
+
+        sign = numeric >= 0 ? 1 : -1;
+        return StrictVerdict.StrictlyTrue;
     }
 
     static StrictVerdict ISqrtable<ExactScalar>.TrySqrt(ExactScalar value, out ExactScalar root)
     {
-        var sign = value.VerifyStrictZero() == StrictResult.StrictlyTrue
-            ? 0
-            : value.Approx >= 0 ? 1 : -1;
-
-        if (sign < 0)
+        var verdict = TrySign(value, out var sign);
+        if (verdict == StrictVerdict.StrictlyTrue && sign < 0)
         {
             root = default;
             return StrictVerdict.StrictlyFalse;
+        }
+        if (verdict != StrictVerdict.StrictlyTrue)
+        {
+            root = default;
+            return verdict;
         }
 
         root = sign == 0 ? Zero : Sqrt(value);

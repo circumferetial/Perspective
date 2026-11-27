@@ -9,7 +9,8 @@ public enum GeneralizedCircleKind
     Line,
     Point,
     Imaginary,
-    Empty
+    Empty,
+    Unknown
 }
 
 /// <summary>
@@ -109,7 +110,11 @@ public static class GeneralizedCircleClassify
                 : GeneralizedCircleKind.Line;
 
         var discriminant = c.B * c.B + c.C * c.C - T.FromLong(4) * c.A * c.D;
-        return T.Sign(discriminant) switch
+        var verdict = T.TrySign(discriminant, out var sign);
+        if (verdict != StrictVerdict.StrictlyTrue)
+            return GeneralizedCircleKind.Unknown;
+
+        return sign switch
         {
             < 0 => GeneralizedCircleKind.Imaginary,
             0 => GeneralizedCircleKind.Point,

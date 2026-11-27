@@ -223,8 +223,16 @@ public sealed class PolyExpr : IExactRing<PolyExpr>, IIntegralDomain<PolyExpr>, 
     ///     会按数值容差压成零，因此混合 <c>ExactScalar.FromApprox</c> 的链路里它可能把
     ///     “近似零”报成严格零；纯符号证明场景不受影响。
     /// </remarks>
-    public static StrictResult VerifyZero(PolyExpr a) =>
-        a.SimplifyCoeffs().IsZero ? StrictResult.StrictlyTrue : StrictResult.StrictlyFalse;
+    public static StrictResult VerifyZero(PolyExpr a)
+    {
+        var simplified = a.SimplifyCoeffs();
+        if (simplified.IsZero) return StrictResult.StrictlyTrue;
+
+        // 纯近似系数不能被当成“已证非零”，也不能被容差吞成零。
+        if (simplified.RawTerms.Any(t => t.C.Exact is null))
+            return StrictResult.NoSymbolicData;
+        return StrictResult.StrictlyFalse;
+    }
 
     static bool IExactRing<PolyExpr>.IsZeroFast(PolyExpr a) => a.IsZero;
 
@@ -445,11 +453,8 @@ public sealed class PolyExpr : IExactRing<PolyExpr>, IIntegralDomain<PolyExpr>, 
         }
     }
 
-    internal static bool IsCoeffZero(ExactScalar c)
-    {
-        if (c.Exact is null) return c.IsNumericallyZero();
-        return c.VerifyStrictZero() == StrictResult.StrictlyTrue;
-    }
+    internal static bool IsCoeffZero(ExactScalar c) =>
+        c.VerifyStrictZero() == StrictResult.StrictlyTrue;
 
     private static PolyExpr FromDictionary(Dictionary<Monomial, ExactScalar> dict)
     {
