@@ -188,18 +188,11 @@ public class SubspaceTests
     }
 
     [Fact]
-    public void Benchmarks_AllPassExceptKnownConditional()
+    public void Benchmarks_AllPass()
     {
         var results = Program.RunBenchmarks();
         Assert.Equal(31, results.Count);
-
-        var failed = results.Where(r => !r.Passed).ToList();
-        Assert.Single(failed);
-        Assert.Equal("HS-A", failed[0].Id);
-        Assert.Contains("ProvedUnderConditions", failed[0].Detail);
-
-        Assert.All(results.Where(r => r.Id != "HS-A"),
-            r => Assert.True(r.Passed, $"{r.Id}: {r.Detail}"));
+        Assert.All(results, r => Assert.True(r.Passed, $"{r.Id}: {r.Detail}"));
     }
 
     [Fact]

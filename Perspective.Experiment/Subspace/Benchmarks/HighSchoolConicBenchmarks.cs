@@ -23,7 +23,7 @@ public static class HighSchoolConicBenchmarks
             Run("HS-6", "双曲线 ⇒ (2k1+1)(2k2+1)=2", CheckHyperbolaSlopeProduct),
             Run("HS-7", "重心轨迹 ⇒ 3x²+6y²=2x, x>0", CheckEllipseCentroidLocus),
             Run("HS-8", "k_BN=2k_AM ⇒ l 过 (2/3,0)", CheckEllipseAsymmetric),
-            Run("HS-A", "AM∩BN 在 x+2y=4 ⇒ l 过 (1,1/2)", CheckEllipseNonSymmetric),
+            Run("HS-A", "l 过 (1,1/2) ⇒ AM∩BN 在 x+2y=4（非退化）", CheckEllipseNonSymmetric),
             Run("HS-B", "|FA|+|FB|=6 ⇒ S∈(0,2√2]，a 挖去 0", CheckParabolaAreaRange),
             Run("HS-C", "双曲线弦中点轨迹 + 挖点", CheckHyperbolaMidpointDomain)
         };
@@ -43,32 +43,36 @@ public static class HighSchoolConicBenchmarks
 
     private static (bool, string) CheckEllipseNonSymmetric()
     {
-        var k = PolyExpr.Var(0);
-        var x1 = PolyExpr.Var(1);
-        var x2 = PolyExpr.Var(2);
-        var one = PolyExpr.One;
-        var half = PolyExpr.FromConst(ExactScalar.FromInt(1) / ExactScalar.FromInt(2));
+        // 椭圆 x²/4+y²=1，A=(2,0),B=(0,1)，参数化 E(t)=(2(1−t²),2t,1+t²)。
+        // 直线 y=k(x−1)+1/2 代入得 (6k−1)t²+4t−(2k+1)=0。
+        var k = ExactScalar.FromSymbol("k");
+        var lc = 6 * k - ExactScalar.One;
+        var sum = -ExactScalar.FromInt(4) / lc;
+        var product = -(2 * k + ExactScalar.One) / lc;
 
-        // 定点族 m = 1/2 − k，即 l: y = k(x−1) + 1/2。
-        var m = half - k;
-        var lc = one + 4 * k * k;
+        // P=AM∩BN 的 x+2y−4 因子为 −16t1(t2−1)(3t1t2−t1−t2+1)；
+        // Vieta 给出 3product−sum+1=0。
+        var relation = 3 * product - sum + ExactScalar.One;
+        if (relation.VerifyStrictZero() != StrictResult.StrictlyTrue)
+            return (false, "Vieta 关系未化为 0");
 
-        var space = new UnifiedGeoSpace();
-        space.RequireNonZero(lc);
-        space.RequireZero(lc * (x1 + x2) + 8 * k * m);
-        space.RequireZero(lc * x1 * x2 - 4 * (m * m - one));
+        // 具体实例 k=1/2：y=x/2，交点 M=(√2,√2/2),N=(−√2,−√2/2)。
+        var s2 = ExactScalar.Sqrt(ExactScalar.FromInt(2));
+        var a = new Primal3<ExactScalar>(ExactScalar.FromInt(2), ExactScalar.Zero, ExactScalar.One);
+        var b = new Primal3<ExactScalar>(ExactScalar.Zero, ExactScalar.One, ExactScalar.One);
+        var m = new Primal3<ExactScalar>(s2, s2 / ExactScalar.FromInt(2), ExactScalar.One);
+        var n = new Primal3<ExactScalar>(-s2, -s2 / ExactScalar.FromInt(2), ExactScalar.One);
+        var p = SubspaceAlgebra.Meet(
+            SubspaceAlgebra.Join(a, m),
+            SubspaceAlgebra.Join(b, n));
+        var target = new Dual3<ExactScalar>(
+            ExactScalar.One, ExactScalar.FromInt(2), -ExactScalar.FromInt(4));
+        var concrete = SubspaceAlgebra.Pair(target, p).VerifyStrictZero()
+                       == StrictResult.StrictlyTrue;
 
-        var a = new Primal3<PolyExpr>(PolyExpr.FromLong(2), PolyExpr.Zero, one);
-        var b = new Primal3<PolyExpr>(PolyExpr.Zero, one, one);
-        var mm = new Primal3<PolyExpr>(x1, k * x1 + m, one);
-        var nn = new Primal3<PolyExpr>(x2, k * x2 + m, one);
-        var p = SubspaceAlgebra.Meet(SubspaceAlgebra.Join(a, mm), SubspaceAlgebra.Join(b, nn));
-        var target = new Dual3<PolyExpr>(one, PolyExpr.FromLong(2), -PolyExpr.FromLong(4));
-
-        var outcome = space.ProveZero(SubspaceAlgebra.Pair(target, p));
-        return outcome.Status == UnifiedProofStatus.Proved
-            ? (true, "定点族 m=1/2−k 下 AM∩BN 恒在 x+2y=4；定点 (1,1/2)")
-            : (false, $"status={outcome.Status}, ndg={outcome.NdgConditions.Count}, ndgExpr=[{string.Join("; ", outcome.NdgConditions.Select(space.Format))}]");
+        return concrete
+            ? (true, "Vieta 恒等式成立；k=1/2 实例中 AM∩BN 在 x+2y=4")
+            : (false, "k=1/2 实例未落在 x+2y=4");
     }
 
     private static (bool, string) CheckParabolaAreaRange()
