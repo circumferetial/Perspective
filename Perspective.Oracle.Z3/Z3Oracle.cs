@@ -31,16 +31,19 @@ public sealed class Z3Oracle : IAlgebraicOracle, IDisposable
         IReadOnlyList<RelationStatement> constraints)
     {        try
         {
+            _sqrtCounter = 0;
             var env = variables.ToDictionary(v => v, v => (ArithExpr)_context.MkRealConst(v));
 
             var assertions = new List<BoolExpr>(constraints.Count);
+            var sideConstraints = new List<BoolExpr>();
             foreach (var constraint in constraints)
             {
-                var compiled = CompileRelation(constraint, env);
+                var compiled = CompileRelation(constraint, env, sideConstraints);
                 if (compiled is null)
                     return OracleVerdict.Unknown("约束含不可编译节点（根式/超越函数/符号分母）");
                 assertions.Add(compiled);
             }
+            assertions.AddRange(sideConstraints);
 
             var solver = _context.MkSolver();
             solver.Set("timeout", _timeoutMs);
@@ -77,10 +80,13 @@ public sealed class Z3Oracle : IAlgebraicOracle, IDisposable
         };
     }
 
-    private BoolExpr? CompileRelation(RelationStatement relation, Dictionary<string, ArithExpr> env)
+    private BoolExpr? CompileRelation(
+        RelationStatement relation,
+        Dictionary<string, ArithExpr> env,
+        List<BoolExpr> sideConstraints)
     {
-        var left = Compile(relation.Left, env);
-        var right = Compile(relation.Right, env);
+        var left = Compile(relation.Left, env, sideConstraints);
+        var right = Compile(relation.Right, env, sideConstraints);
         if (left is null || right is null) return null;
 
         return relation.Kind switch
@@ -95,14 +101,22 @@ public sealed class Z3Oracle : IAlgebraicOracle, IDisposable
         };
     }
 
-    private ArithExpr? Compile(ExactScalar scalar, Dictionary<string, ArithExpr> env) =>
-        scalar.Exact is null ? null : CompileEntity(scalar.Exact, env);
+    private ArithExpr? Compile(
+        ExactScalar scalar,
+        Dictionary<string, ArithExpr> env,
+        List<BoolExpr> sideConstraints) =>
+        scalar.Exact is null ? null : CompileEntity(scalar.Exact, env, sideConstraints);
 
     /// <summary>
-    /// 只编译"有理系数多项式"片段：整数/有理数、变量、+−×、整数幂（展开）、除以有理常数。
-    /// 其余（根式、三角、变量在分母）一律返回 null → 上层报 Unknown。
+    /// 只编译"有理系数多项式 + 可正则化根式"片段：
+    /// 整数/有理数、变量、+−×、整数幂、除以有理常数；
+    /// sqrt(e) 引入 s，并加 s²=e、s≥0。
+    /// 其余（三角、变量在分母、超越）返回 null → 上层报 Unknown。
     /// </summary>
-    private ArithExpr? CompileEntity(Entity entity, Dictionary<string, ArithExpr> env)
+    private ArithExpr? CompileEntity(
+        Entity entity,
+        Dictionary<string, ArithExpr> env,
+        List<BoolExpr> sideConstraints)
     {
         switch (entity)
         {
@@ -119,28 +133,28 @@ public sealed class Z3Oracle : IAlgebraicOracle, IDisposable
 
             case Entity.Sumf sum:
             {
-                var a = CompileEntity(sum.NodeFirstChild, env);
-                var b = CompileEntity(sum.NodeSecondChild, env);
+                var a = CompileEntity(sum.NodeFirstChild, env, sideConstraints);
+                var b = CompileEntity(sum.NodeSecondChild, env, sideConstraints);
                 return a is null || b is null ? null : _context.MkAdd(a, b);
             }
 
             case Entity.Minusf difference:
             {
-                var a = CompileEntity(difference.NodeFirstChild, env);
-                var b = CompileEntity(difference.NodeSecondChild, env);
+                var a = CompileEntity(difference.NodeFirstChild, env, sideConstraints);
+                var b = CompileEntity(difference.NodeSecondChild, env, sideConstraints);
                 return a is null || b is null ? null : _context.MkSub(a, b);
             }
 
             case Entity.Mulf product:
             {
-                var a = CompileEntity(product.NodeFirstChild, env);
-                var b = CompileEntity(product.NodeSecondChild, env);
+                var a = CompileEntity(product.NodeFirstChild, env, sideConstraints);
+                var b = CompileEntity(product.NodeSecondChild, env, sideConstraints);
                 return a is null || b is null ? null : _context.MkMul(a, b);
             }
 
             case Entity.Divf quotient:
             {
-                var numerator = CompileEntity(quotient.NodeFirstChild, env);
+                var numerator = CompileEntity(quotient.NodeFirstChild, env, sideConstraints);
                 if (numerator is null) return null;
 
                 // 只允许除以有理常数（变量/根式在分母 → Unknown，等后续正则化）
@@ -158,13 +172,24 @@ public sealed class Z3Oracle : IAlgebraicOracle, IDisposable
                 };
             }
 
+            case Entity.Powf power when IsHalfExponent(power.Exponent):
+            {
+                var radicand = CompileEntity(power.Base, env, sideConstraints);
+                if (radicand is null) return null;
+
+                var root = (ArithExpr)_context.MkRealConst($"sqrt_{_sqrtCounter++}");
+                sideConstraints.Add(_context.MkEq(_context.MkMul(root, root), radicand));
+                sideConstraints.Add(_context.MkGe(root, _context.MkReal(0)));
+                return root;
+            }
+
             case Entity.Powf power:
             {
                 if (power.Exponent is not Entity.Number.Integer exponentEntity) return null;
                 if (!int.TryParse(exponentEntity.ToString(), out int exponent)) return null;
                 if (exponent is < 0 or > MaxPowExponent) return null;
 
-                var @base = CompileEntity(power.Base, env);
+                var @base = CompileEntity(power.Base, env, sideConstraints);
                 if (@base is null) return null;
 
                 ArithExpr result = _context.MkReal(1);
@@ -177,6 +202,13 @@ public sealed class Z3Oracle : IAlgebraicOracle, IDisposable
                 return null;
         }
     }
+
+    private int _sqrtCounter;
+
+    private static bool IsHalfExponent(Entity exponent) =>
+        exponent is Entity.Number.Rational rational
+        && rational.Numerator.ToString() == "1"
+        && rational.Denominator.ToString() == "2";
 
     public void Dispose() => _context.Dispose();
 }

@@ -83,6 +83,24 @@ public class Z3OracleTests
     }
 
     [Fact]
+    public void TryZero_HandlesSquareRoots()
+    {
+        var sqrt2 = ExactScalar.Sqrt(ExactScalar.FromInt(2));
+        Assert.Equal(StrictVerdict.StrictlyTrue,
+            Oracle.TryZero(sqrt2 * sqrt2 - ExactScalar.FromInt(2)));
+
+        var sqrt3 = ExactScalar.Sqrt(ExactScalar.FromInt(3));
+        var sqrt6 = ExactScalar.Sqrt(ExactScalar.FromInt(6));
+        var rhs = ExactScalar.Sqrt(ExactScalar.FromInt(5)
+                                   + ExactScalar.FromInt(2) * sqrt6);
+        Assert.Equal(StrictVerdict.StrictlyTrue,
+            Oracle.TryZero(sqrt2 + sqrt3 - rhs));
+
+        Assert.Equal(StrictVerdict.Unknown,
+            Oracle.TryZero(sqrt2 - ExactScalar.FromApprox(1.4142135623730951)));
+    }
+
+    [Fact]
     public void RationalCoefficients_AreExact()
     {
         // 3x + 1 = 0 有精确解 x = -1/3（若用 double 近似会引入误差）
