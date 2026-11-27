@@ -39,8 +39,29 @@ public static class Incidence
 
 public static class Program
 {
-    public static void Main()
+    public static void Main(string[] args)
     {
+        if (Array.IndexOf(args, "--benchmark") >= 0)
+        {
+            Subspace.Benchmarks.ProblemSet5.RunAll();
+            Subspace.Benchmarks.ParabolaFixedPointBenchmark.Run();
+            Subspace.Benchmarks.HighSchoolConicBenchmarks.RunAll();
+            Subspace.Benchmarks.ProjectiveBenchmarks.HarmonicCrossRatio();
+            Subspace.Benchmarks.ProjectiveBenchmarks.DegeneratePascal();
+            Subspace.Benchmarks.ProjectiveBenchmarks.DegenerateBrianchon();
+            Subspace.Benchmarks.ProjectiveBenchmarks.SymbolicHarmonicCrossRatio();
+            Subspace.Benchmarks.ProjectiveBenchmarks.SymbolicDegeneratePascal();
+            Subspace.Benchmarks.ProjectiveBenchmarks.SymbolicDegenerateBrianchon();
+            Subspace.Benchmarks.ProjectiveBenchmarks.FrameInvariantHarmonicCrossRatio();
+            return;
+        }
+
+        if (Array.IndexOf(args, "--subspace") >= 0)
+        {
+            Subspace.Demos.SubspaceDemos.RunAll();
+            return;
+        }
+
         // 单位圆上的两点
         var p = Vec3.Point(1, 0);
         var q = Vec3.Point(0, 1);

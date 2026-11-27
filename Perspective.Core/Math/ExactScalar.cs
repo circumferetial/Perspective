@@ -12,24 +12,78 @@ public enum StrictResult
     NearZeroUnproven, // 数值极接近 0，但含复杂超越/根式，符号引擎暂未能化简为 0
     NoSymbolicData    // 来源包含纯近似浮点数（如鼠标自由拖拽），无法做严格证明
 }
-// 可以放在 Perspective.Core.Math 命名空间下（与 ExactScalar 同文件）
+/// <summary>通用谓词判定：True/False 为已证，Unknown 为未证，NoSymbolicData 为含近似数据。</summary>
+public enum StrictVerdict
+{
+    StrictlyTrue,
+    StrictlyFalse,
+    Unknown,
+    NoSymbolicData
+}
+
+/// <summary>
+///     交换环的计算签名（不表达也无法表达结合律/分配律/交换律，这些靠文档、测试和分层守住）。
+///     <para>
+///         约定：<c>FromLong</c> 是 \(\mathbb Z\)-代数同态（0/1、加法、乘法保持）；
+///         <c>VerifyZero</c> 是 sound 但不完备的判定；<c>IsZeroFast</c>/<c>IsUnit</c>
+///         只用于 sound 守卫。需要除法/唯一性/平均值时，额外要求 2 是单位。
+///     </para>
+/// </summary>
 public interface IExactRing<T> where T : IExactRing<T>
 {
     abstract static T Zero { get; }
     abstract static T One { get; }
+
+    /// <summary>\(\mathbb Z\)-代数同态：FromLong(0)=Zero、FromLong(1)=One，并保持加法/乘法。</summary>
     abstract static T FromLong(long value);
+
     abstract static T operator +(T a, T b);
     abstract static T operator -(T a, T b);
     abstract static T operator -(T a);
     abstract static T operator *(T a, T b);
+
+    /// <summary>sound 但不完备的零判定：StrictlyFalse 才表示已证非零。</summary>
     abstract static StrictResult VerifyZero(T a);
+
+    /// <summary>只用于“前置条件守卫”的快速零判定，不是判定器。</summary>
+    /// <remarks>
+    ///     契约：
+    ///     1. 返回 true ⇒ 数学上确为零；实现不得用 Approx 近零来返回 true，
+    ///        否则大尺度坐标消去会把有效点误杀成 ZeroVector。
+    ///     2. 返回 false 不表示非零；未化简的代数零可能漏判（PolyExpr 只认结构零）。
+    ///     3. 只用于入口守卫；最终 StrictResult 判定仍用 <see cref="VerifyZero" />。
+    /// </remarks>
+    static virtual bool IsZeroFast(T a) => T.VerifyZero(a) == StrictResult.StrictlyTrue;
+
+    /// <summary>
+    ///     是否为环中的单位：StrictlyTrue ⇒ 确有逆元；StrictlyFalse ⇒ 确无逆元；
+    ///     Unknown ⇒ 未证明。默认 Unknown，绝不能用“非零”代替。
+    /// </summary>
+    static virtual StrictVerdict IsUnit(T a) => StrictVerdict.Unknown;
+}
+
+/// <summary>
+///     整环标记：1≠0 且无零因子。C# 无法强制定律，只能作为语义分层与测试标记。
+/// </summary>
+public interface IIntegralDomain<T> : IExactRing<T> where T : IIntegralDomain<T>
+{
+}
+
+/// <summary>
+///     可计算域：提供三态 <see cref="TryInverse" />。这不是“所有非零元都能判定”的数学域，
+///     而是带 Unknown / NoSymbolicData 的计算契约。
+/// </summary>
+public interface IComputableField<T> : IIntegralDomain<T> where T : IComputableField<T>
+{
+    /// <summary>StrictlyTrue 时 inverse 满足 a·inverse=One；StrictlyFalse/Unknown 时 inverse 无意义。</summary>
+    static abstract StrictVerdict TryInverse(T a, out T inverse);
 }
 /// <summary>
 /// 双轨数字：同时携带“double 近似值”和“AngouriMath 精确代数基因”。
 /// 注意：record struct 默认的 == 为表达式树结构相等，判数学相等请使用
 /// <see cref="AreStrictlyEqual"/> 或 <c>(a - b).VerifyStrictZero()</c>。
 /// </summary>
-public readonly record struct ExactScalar(double Approx, Entity? Exact) : IExactRing<ExactScalar>
+public readonly record struct ExactScalar(double Approx, Entity? Exact) : IExactRing<ExactScalar>, IComputableField<ExactScalar>
 {
     public static ExactScalar Zero => FromInt(0);
     public static ExactScalar One => FromInt(1);
@@ -59,8 +113,46 @@ public readonly record struct ExactScalar(double Approx, Entity? Exact) : IExact
 
     // --- 内部零/一快速检测 ---
 
-    private static bool IsExactZero(Entity? e) => e is not null && e.Equals(Entity.Number.Integer.Zero);
+    private static bool IsExactZero(Entity? e) =>
+        e is not null && e.Equals(Entity.Number.Integer.Zero);
+
+    private static bool IsNumericZero(Entity? e) =>
+        e is Entity.Number.Complex number && number.IsZero;
+
     private static bool IsExactOne(Entity? e) => e is not null && e.Equals(Entity.Number.Integer.One);
+
+    /// <summary>供其它环转发的快速零守卫；只认数值零，不做化简。</summary>
+    public static bool IsZeroFast(ExactScalar a) => IsNumericZero(a.Exact);
+
+    static bool IExactRing<ExactScalar>.IsZeroFast(ExactScalar a) => IsZeroFast(a);
+
+    static StrictVerdict IExactRing<ExactScalar>.IsUnit(ExactScalar a) =>
+        a.VerifyStrictZero() switch
+        {
+            StrictResult.StrictlyTrue => StrictVerdict.StrictlyFalse,
+            StrictResult.StrictlyFalse => StrictVerdict.StrictlyTrue,
+            StrictResult.NearZeroUnproven => StrictVerdict.Unknown,
+            _ => StrictVerdict.NoSymbolicData
+        };
+
+    static StrictVerdict IComputableField<ExactScalar>.TryInverse(ExactScalar a, out ExactScalar inverse)
+    {
+        switch (a.VerifyStrictZero())
+        {
+            case StrictResult.StrictlyFalse:
+                inverse = One / a;
+                return StrictVerdict.StrictlyTrue;
+            case StrictResult.StrictlyTrue:
+                inverse = default;
+                return StrictVerdict.StrictlyFalse;
+            case StrictResult.NearZeroUnproven:
+                inverse = default;
+                return StrictVerdict.Unknown;
+            default:
+                inverse = default;
+                return StrictVerdict.NoSymbolicData;
+        }
+    }
 
     /// <summary>在关键节点折叠表达式树，防止雪球膨胀</summary>
     public ExactScalar Simplified() => Exact is null ? this : this with { Exact = Exact.Simplify() };
@@ -98,8 +190,11 @@ public readonly record struct ExactScalar(double Approx, Entity? Exact) : IExact
         if (a.Exact is null || b.Exact is null) return new(a.Approx / b.Approx, null);
         if (IsExactOne(b.Exact)) return a;
         // 除数为精确 0（含未折叠但恒等于 0 的表达式）时显式报错，避免 AngouriMath 静默给出 ComplexInfinity
-        if (IsExactZero(b.Exact) ||
-            (b.IsNumericallyZero() && b.VerifyStrictZero(allowFastNumericReject: false) == StrictResult.StrictlyTrue))
+        if (IsExactZero(b.Exact)
+            || (!double.IsFinite(b.Approx)
+                && b.VerifyStrictZero(allowFastNumericReject: false) == StrictResult.StrictlyTrue)
+            || (b.IsNumericallyZero()
+                && b.VerifyStrictZero(allowFastNumericReject: false) == StrictResult.StrictlyTrue))
             throw new DivideByZeroException("精确除法：除数为 0，结果无定义。");
         if (IsExactZero(a.Exact)) return FromInt(0);
         return new(a.Approx / b.Approx, a.Exact / b.Exact);
@@ -176,7 +271,16 @@ public readonly record struct ExactScalar(double Approx, Entity? Exact) : IExact
     /// <summary>【快通道】仅用于画图渲染、判断无穷远、初步吸附筛选</summary>
     public bool IsNumericallyZero(double tol = 1e-9) => System.Math.Abs(Approx) < tol;
 
-    /// <summary>【严通道】向用户宣布相切、共线、过定点等结论前，必须过这一关！</summary>
+    /// <summary>
+    ///     【严通道】向用户宣布相切、共线、过定点等结论前，必须过这一关！
+    ///     <para>
+    ///         注意：默认会用 <c>|Approx| &gt; 1e-4</c> 做“显然非零”的快判。若表达式本身因整体缩放
+    ///         或相消导致 Approx 不可靠（典型：齐次坐标下的行列式/关联式，坐标尺度很大时），
+    ///         可能把恒为零的式子误报成 <see cref="StrictResult.StrictlyFalse" />。
+    ///         这类场景请先规范化代表元，或改用 <see cref="VerifyStrictZero(bool)" /> 传
+    ///         <c>allowFastNumericReject: false</c>。
+    ///     </para>
+    /// </summary>
     public StrictResult VerifyStrictZero() => VerifyStrictZero(allowFastNumericReject: true);
 
     /// <summary>
@@ -254,7 +358,9 @@ public readonly record struct ExactScalar(double Approx, Entity? Exact) : IExact
     {
         entity = UnwrapProvided(entity);
 
-        if (entity.Equals(Entity.Number.Integer.Zero))
+        // 数值节点（Integer / Rational / Real / Complex）统一用 IsZero：
+        // 不要用 Equals(Integer.Zero)，否则 Real/Complex 的零会被误判成 StrictlyFalse。
+        if (IsNumericZero(entity))
             return StrictResult.StrictlyTrue;
         if (entity is Entity.Number)
             return StrictResult.StrictlyFalse;
