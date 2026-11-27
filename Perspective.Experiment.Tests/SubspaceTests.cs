@@ -1194,6 +1194,42 @@ public class SubspaceTests
     }
 
     [Fact]
+    public void ConicFoci_ExtractsEllipseHyperbolaCircle()
+    {
+        var ellipse = new BilinearForm3<ExactScalar>(
+            S(1) / S(4), S(0), S(0),
+            S(1) / S(3), S(0), S(-1));
+        var ef = ellipse.Foci().Value;
+        Assert.Equal(ConicKind.Ellipse, ef.Kind);
+        Assert.Equal(0.5, ef.Eccentricity.Approx, 10);
+        Assert.Equal(StrictResult.StrictlyTrue,
+            SubspaceAlgebra.SameSubspace(ef.Focus1, Primal3<ExactScalar>.Fixed(1, 0)).Value);
+        Assert.Equal(StrictResult.StrictlyTrue,
+            SubspaceAlgebra.SameSubspace(ef.Focus2, Primal3<ExactScalar>.Fixed(-1, 0)).Value);
+
+        var hyperbola = new BilinearForm3<ExactScalar>(
+            S(1), S(0), S(0),
+            S(-1) / S(3), S(0), S(-1));
+        var hf = hyperbola.Foci().Value;
+        Assert.Equal(ConicKind.Hyperbola, hf.Kind);
+        Assert.Equal(2.0, hf.Eccentricity.Approx, 10);
+        Assert.Equal(StrictResult.StrictlyTrue,
+            SubspaceAlgebra.SameSubspace(hf.Focus1, Primal3<ExactScalar>.Fixed(2, 0)).Value);
+
+        var circle = new BilinearForm3<ExactScalar>(
+            S(1), S(0), S(0),
+            S(1), S(0), S(-1));
+        var cf = circle.Foci().Value;
+        Assert.Equal(ConicKind.Circle, cf.Kind);
+        Assert.Equal(0.0, cf.Eccentricity.Approx, 10);
+
+        var rotated = new BilinearForm3<ExactScalar>(
+            S(1), S(1) / S(2), S(0),
+            S(1), S(0), S(-1));
+        Assert.True(rotated.Foci().IsFailure);
+    }
+
+    [Fact]
     public void Result_DefaultIsFailure()
     {
         var failed = default(Result<int, GeometryError>);
