@@ -29,6 +29,19 @@ public sealed class NumericProblemTests
     }
 
     [Fact]
+    public void HS8_SingleSqrt_Witness()
+    {
+        // t=2/3 时 x=2/3 与椭圆 x²/4+y²=1 交于 y=±√(8/3)。
+        var t = R(2, 3);
+        var y = QuadScalar.FromSqrt(Q(8, 3)); // √(8/3) = 2√6/3
+        var k1 = y / (t + R(2));
+        var k2 = -y / (t - R(2));
+
+        Assert.Equal(StrictResult.StrictlyTrue,
+            QuadScalar.VerifyZero(k2 - R(2) * k1));
+    }
+
+    [Fact]
     public void HS5_SingleSqrt_TangentArea()
     {
         // x²−y²/3=1, tangent y=2x+1；与渐近线 y=±√3x 的交点面积²。
