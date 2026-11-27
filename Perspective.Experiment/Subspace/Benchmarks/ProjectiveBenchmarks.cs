@@ -293,6 +293,56 @@ public static class ProjectiveBenchmarks
         return new BenchmarkResult("PR-3F", "(U,V;X,Y)=−1", "ConicFrame 归一化", ok, detail, sw.ElapsedMilliseconds);
     }
 
+    public static BenchmarkResult FrameInvariantDegeneratePascal()
+    {
+        var sw = Stopwatch.StartNew();
+
+        // 任意 A=P(2),B=P(5)，割线 M=P(3),N=P(−1) 过两条切线的交点。
+        var a = Primal3<ExactScalar>.Fixed(4, 2);
+        var b = Primal3<ExactScalar>.Fixed(25, 5);
+        var m = Primal3<ExactScalar>.Fixed(9, 3);
+        var n = Primal3<ExactScalar>.Fixed(1, -1);
+
+        var frame = ConicFrame.FromThreeParameters(
+            ExactScalar.FromInt(2),
+            ExactScalar.FromInt(5),
+            ExactScalar.FromInt(4)).Value;
+
+        var a2 = frame.ApplyPoint(a).Value;
+        var b2 = frame.ApplyPoint(b).Value;
+        var m2 = frame.ApplyPoint(m).Value;
+        var n2 = frame.ApplyPoint(n).Value;
+
+        var conic = new BilinearForm3<ExactScalar>(
+            ExactScalar.Zero,
+            ExactScalar.Zero,
+            -ExactScalar.FromInt(1) / ExactScalar.FromInt(2),
+            ExactScalar.One,
+            ExactScalar.Zero,
+            ExactScalar.Zero);
+
+        var ta = conic.Polar(a2);
+        var tb = conic.Polar(b2);
+        var x1 = SubspaceAlgebra.Meet(SubspaceAlgebra.Join(a2, m2), tb);
+        var y1 = SubspaceAlgebra.Meet(SubspaceAlgebra.Join(b2, m2), ta);
+        var x2 = SubspaceAlgebra.Meet(SubspaceAlgebra.Join(a2, n2), tb);
+        var y2 = SubspaceAlgebra.Meet(SubspaceAlgebra.Join(b2, n2), ta);
+
+        var concurrent = SubspaceAlgebra.AreConcurrent(
+            SubspaceAlgebra.Join(x1, y1),
+            SubspaceAlgebra.Join(x2, y2),
+            SubspaceAlgebra.Join(a2, b2));
+
+        var ok = concurrent.TryGet(out var verdict) && verdict == StrictResult.StrictlyTrue;
+        sw.Stop();
+        var detail = ok
+            ? "ConicFrame 归一化后，退化 Pascal 三线仍共点"
+            : "归一化后三线不共点";
+
+        Console.WriteLine($"[PR-2F] {(ok ? "PASS" : "FAIL")}  {sw.ElapsedMilliseconds,4}ms  {detail}");
+        return new BenchmarkResult("PR-2F", "X1Y1、X2Y2、AB 共点", "ConicFrame + Pascal", ok, detail, sw.ElapsedMilliseconds);
+    }
+
     private static Result<ExactScalar, GeometryError> CrossRatioOnUv(
         Primal3<ExactScalar> u,
         Primal3<ExactScalar> v,
