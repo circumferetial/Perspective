@@ -17,7 +17,8 @@
 - 高中圆锥曲线：11 项；
 - 标准基准：7 项；
 - 抛物线定点：P-FIX；
-- 射影：PR-1/2/3、PR-1S/2S/3S、PR-1F/2F/3F。
+- 射影：PR-1/2/3、PR-1S/2S/3S、PR-1F/2F/3F；
+- 覆盖洞：COV-1（焦点/准线）、COV-2（切线/极线）、COV-3（圆交圆）。
 
 ### conic 特征
 
@@ -43,6 +44,7 @@
 3. `ConicFeatures` 只处理 `Q01=0` 的轴对齐 conic；旋转 conic 返回失败。
 4. 群变换是“按需部分群作用”，不是统一群接口；见 `docs/transformations.md`。
 5. PGL(2) 完整引擎未实现；边界见 `docs/pgl2-automorphism.md`。
+6. 一般 conic–conic 求交未实现；当前只有“直线 ∩ conic”和“圆 ∩ 圆”。
 
 ## 退出标准
 

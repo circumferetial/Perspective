@@ -55,6 +55,7 @@ public static class Program
             Subspace.Benchmarks.ProjectiveBenchmarks.FrameInvariantHarmonicCrossRatio();
             Subspace.Benchmarks.ProjectiveBenchmarks.FrameInvariantDegeneratePascal();
             Subspace.Benchmarks.ProjectiveBenchmarks.FrameInvariantDegenerateBrianchon();
+            Subspace.Benchmarks.CoverageBenchmarks.RunAll();
             return;
         }
 
