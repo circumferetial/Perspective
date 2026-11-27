@@ -1186,6 +1186,11 @@ public class SubspaceTests
             SubspaceAlgebra.SameSubspace(p2, Primal3<ExactScalar>.Fixed(0, 0)).Value);
         Assert.Equal(StrictResult.StrictlyTrue,
             SubspaceAlgebra.SameSubspace(p3, Primal3<ExactScalar>.Fixed(1, 1)).Value);
+
+        var inverse = frame.Inverse().Value;
+        var identity = frame.Compose(inverse).Value;
+        var back = identity.ApplyParameter(S(7)).Value;
+        Assert.Equal(StrictResult.StrictlyTrue, (back - S(7)).VerifyStrictZero());
     }
 
     [Fact]

@@ -115,6 +115,9 @@ public readonly record struct UnitPhase(ExactScalar Cos, ExactScalar Sin)
     }
 
     public UnitPhase Conjugate() => new(Cos, -Sin);
+
+    public UnitPhase Inverse() => Conjugate();
+
     public ExactComplex ToComplex() => new(Cos, Sin);
 
     /// <summary>相位复合：e^(iα) · e^(iβ) = e^(i(α+β))。</summary>

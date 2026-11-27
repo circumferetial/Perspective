@@ -9,6 +9,31 @@ namespace Perspective.Experiment.Subspace;
 /// </summary>
 public readonly record struct ConicFrame(ExactScalar A, ExactScalar B, ExactScalar C, ExactScalar D)
 {
+    public ExactScalar Determinant => A * D - B * C;
+
+    public bool IsInvertible => Determinant.VerifyStrictZero() != StrictResult.StrictlyTrue;
+
+    /// <summary>this ∘ other（先作用 other，再作用 this）。</summary>
+    public Result<ConicFrame, GeometryError> Compose(ConicFrame other)
+    {
+        if (!IsInvertible || !other.IsInvertible)
+            return Result<ConicFrame, GeometryError>.Fail(GeometryError.UndefinedParameter);
+
+        return Result<ConicFrame, GeometryError>.Ok(new ConicFrame(
+            A * other.A + B * other.C,
+            A * other.B + B * other.D,
+            C * other.A + D * other.C,
+            C * other.B + D * other.D));
+    }
+
+    public Result<ConicFrame, GeometryError> Inverse()
+    {
+        if (!IsInvertible)
+            return Result<ConicFrame, GeometryError>.Fail(GeometryError.UndefinedParameter);
+
+        return Result<ConicFrame, GeometryError>.Ok(new ConicFrame(D, -B, -C, A));
+    }
+
     /// <summary>由三个互异参数构造 t ↦ (At+B)/(Ct+D)，使 t0→0、t1→1、t2→∞。</summary>
     public static Result<ConicFrame, GeometryError> FromThreeParameters(
         ExactScalar t0,
