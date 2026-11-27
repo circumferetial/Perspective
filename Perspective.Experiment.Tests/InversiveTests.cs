@@ -1,5 +1,6 @@
 using Perspective.Core.Math;
 using Perspective.Experiment.Inversive;
+using Perspective.Experiment.Subspace;
 using Xunit;
 
 namespace Perspective.Experiment.Tests;
@@ -61,6 +62,29 @@ public sealed class InversiveTests
         Assert.Equal(StrictResult.StrictlyTrue,
             inverted.Eval(new Vec2<ExactScalar>(S(3) / S(2), S(1) / S(2)))
                 .VerifyStrictZero());
+    }
+
+    [Fact]
+    public void ComplexMobius_TransformsCircle()
+    {
+        var unit = new GeneralizedCircle<ExactComplex>(
+            ExactComplex.One, ExactComplex.Zero,
+            ExactComplex.Zero, -ExactComplex.One);
+        var translation = new MobiusMap(
+            ExactComplex.One, ExactComplex.One,
+            ExactComplex.Zero, ExactComplex.One);
+
+        var image = translation.Apply(unit).Value;
+
+        // z ↦ z+1 把单位圆变成 |w−1|=1，即 w²−w−w̄=0。
+        foreach (var z in new[]
+                 {
+                     ExactComplex.Zero,
+                     ExactComplex.FromLong(2),
+                     ExactComplex.One + ExactComplex.I
+                 })
+            Assert.Equal(StrictResult.StrictlyTrue,
+                image.EvalAt(HComplex.From(z)).VerifyStrictZero());
     }
 
     [Fact]
