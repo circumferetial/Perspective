@@ -29,6 +29,31 @@ public sealed class NumericProblemTests
     }
 
     [Fact]
+    public void HS3_Rational_FocusChordReciprocal()
+    {
+        // y²=4x 的焦点弦端点 y1=1, y2=-4。
+        var y1 = Q(1);
+        var y2 = Q(-4);
+        var invFm = Q(4) / (y1 * y1 + Q(4));
+        var invFn = Q(4) / (y2 * y2 + Q(4));
+
+        Assert.Equal(StrictResult.StrictlyTrue,
+            BigRational.VerifyZero(invFm + invFn - BigRational.One));
+    }
+
+    [Fact]
+    public void HS7_Rational_CentroidLocus()
+    {
+        var m = Q(1);
+        var den = Q(3) * (m * m + Q(2));
+        var x = Q(4) / den;
+        var y = Q(-2) * m / den;
+
+        Assert.Equal(StrictResult.StrictlyTrue,
+            BigRational.VerifyZero(Q(3) * x * x + Q(6) * y * y - Q(2) * x));
+    }
+
+    [Fact]
     public void HS8_SingleSqrt_Witness()
     {
         // t=2/3 时 x=2/3 与椭圆 x²/4+y²=1 交于 y=±√(8/3)。
