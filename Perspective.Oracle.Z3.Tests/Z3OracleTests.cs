@@ -96,6 +96,19 @@ public class Z3OracleTests
     }
 
     [Fact]
+    public void TryZero_HandlesTwoIndependentSquareRoots()
+    {
+        var sqrt2 = ExactScalar.Sqrt(ExactScalar.FromInt(2));
+        var sqrt5 = ExactScalar.Sqrt(ExactScalar.FromInt(5));
+        var sqrt10 = ExactScalar.Sqrt(ExactScalar.FromInt(10));
+        var rhs = ExactScalar.Sqrt(ExactScalar.FromInt(7)
+                                   + ExactScalar.FromInt(2) * sqrt10);
+
+        Assert.Equal(StrictVerdict.StrictlyTrue,
+            Oracle.TryZero(sqrt2 + sqrt5 - rhs));
+    }
+
+    [Fact]
     public void TryZero_HandlesSquareRoots()
     {
         var sqrt2 = ExactScalar.Sqrt(ExactScalar.FromInt(2));
