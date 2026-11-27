@@ -29,8 +29,7 @@ public sealed class Z3Oracle : IAlgebraicOracle, IDisposable
     public OracleVerdict DecideExists(
         IReadOnlyList<string> variables,
         IReadOnlyList<RelationStatement> constraints)
-    {
-        try
+    {        try
         {
             var env = variables.ToDictionary(v => v, v => (ArithExpr)_context.MkRealConst(v));
 
@@ -58,6 +57,24 @@ public sealed class Z3Oracle : IAlgebraicOracle, IDisposable
         {
             return OracleVerdict.Unknown("Z3 异常：" + ex.Message);
         }
+    }
+
+    /// <summary>
+    ///     闭式表达式的零判定：查询“expression != 0 是否有反例”。
+    ///     UNSAT ⇒ StrictlyTrue（依赖 Z3 可信）；SAT ⇒ StrictlyFalse；否则 Unknown。
+    /// </summary>
+    public StrictVerdict TryZero(ExactScalar expression)
+    {
+        var verdict = DecideExists(
+            [],
+            [new RelationStatement(RelationKind.NotEqual, expression, ExactScalar.Zero)]);
+
+        return verdict.Kind switch
+        {
+            OracleVerdictKind.Unsat => StrictVerdict.StrictlyTrue,
+            OracleVerdictKind.Sat => StrictVerdict.StrictlyFalse,
+            _ => StrictVerdict.Unknown
+        };
     }
 
     private BoolExpr? CompileRelation(RelationStatement relation, Dictionary<string, ArithExpr> env)

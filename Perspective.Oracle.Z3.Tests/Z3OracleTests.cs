@@ -66,6 +66,23 @@ public class Z3OracleTests
     }
 
     [Fact]
+    public void TryZero_ClosesRationalIdentities()
+    {
+        Assert.Equal(StrictVerdict.StrictlyTrue,
+            Oracle.TryZero(ExactScalar.FromInt(0)));
+        Assert.Equal(StrictVerdict.StrictlyFalse,
+            Oracle.TryZero(ExactScalar.FromInt(1)));
+
+        var identity = ExactScalar.FromInt(1) / ExactScalar.FromInt(3)
+                       + ExactScalar.FromInt(1) / ExactScalar.FromInt(6)
+                       - ExactScalar.FromInt(1) / ExactScalar.FromInt(2);
+        Assert.Equal(StrictVerdict.StrictlyTrue, Oracle.TryZero(identity));
+
+        Assert.Equal(StrictVerdict.Unknown,
+            Oracle.TryZero(ExactScalar.FromApprox(1e-12)));
+    }
+
+    [Fact]
     public void RationalCoefficients_AreExact()
     {
         // 3x + 1 = 0 有精确解 x = -1/3（若用 double 近似会引入误差）
