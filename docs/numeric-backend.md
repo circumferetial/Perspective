@@ -11,6 +11,16 @@
 - `VerifyZero`、`TryInverse`、`TrySign`、`TrySqrt`；
 - `TrySqrt` 只接受有理平方数，其余返回 `StrictlyFalse`（Q 内无根）。
 
+### QuadScalar
+
+`Perspective.Core/Math/QuadScalar.cs`
+
+- `a + b√d`，单个二次扩张；
+- `FromSqrt(BigRational)` 做平方因子分解；
+- 精确零/符号/逆；
+- 不同 `d` 的混合会抛 `NotSupportedException`，表示超出片段；
+- 不实现一般 `TrySqrt`（域内不一定闭合）。
+
 ### Z3 oracle
 
 `Perspective.Oracle.Z3/Z3Oracle.cs`
@@ -37,13 +47,12 @@
 
 ## 未实现
 
-- `QuadScalar`（单二次扩张）；
 - `RealAlgebraic`（根隔离/Sturm）；
 - FLINT/CGAL 胶水；
 - Z3 fallback 在几何层的统一接线。
 
 ## 下一步
 
-1. `QuadScalar`；
+1. 用 `QuadScalar` 做单根号 conic 特征/交点；
 2. 选一个几何 fallback 点接 `TryProveZero`；
 3. 再评估是否需要 `RealAlgebraic`。
