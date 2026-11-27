@@ -21,26 +21,51 @@ public enum StrictVerdict
     NoSymbolicData
 }
 
+public interface IAdditiveMagma<T> where T : IAdditiveMagma<T>
+{
+    abstract static T operator +(T a, T b);
+}
+
+/// <summary>加法幺半群：0 元只有在加法存在后才有意义。</summary>
+public interface IAdditiveMonoid<T> : IAdditiveMagma<T> where T : IAdditiveMonoid<T>
+{
+    abstract static T Zero { get; }
+}
+
+public interface IAdditiveGroup<T> : IAdditiveMonoid<T> where T : IAdditiveGroup<T>
+{
+    abstract static T operator -(T a, T b);
+    abstract static T operator -(T a);
+}
+
+public interface IMultiplicativeMagma<T> where T : IMultiplicativeMagma<T>
+{
+    abstract static T operator *(T a, T b);
+}
+
+/// <summary>乘法幺半群：1 元只有在乘法存在后才有意义。</summary>
+public interface IMultiplicativeMonoid<T> : IMultiplicativeMagma<T> where T : IMultiplicativeMonoid<T>
+{
+    abstract static T One { get; }
+}
+
+public interface IMultiplicativeGroup<T> : IMultiplicativeMonoid<T> where T : IMultiplicativeGroup<T>
+{
+    static abstract StrictVerdict TryInverse(T a, out T inverse);
+}
+
 /// <summary>
 ///     交换环的计算签名（不表达也无法表达结合律/分配律/交换律，这些靠文档、测试和分层守住）。
 ///     <para>
-///         约定：<c>FromLong</c> 是 \(\mathbb Z\)-代数同态（0/1、加法、乘法保持）；
-///         <c>VerifyZero</c> 是 sound 但不完备的判定；<c>IsZeroFast</c>/<c>IsUnit</c>
-///         只用于 sound 守卫。需要除法/唯一性/平均值时，额外要求 2 是单位。
+///         组合自加法群、乘法幺半群；<c>FromLong</c>/<c>VerifyZero</c>/<c>IsUnit</c>
+///         是额外的计算语义，不混入 0/1 的定义。
 ///     </para>
 /// </summary>
-public interface IExactRing<T> where T : IExactRing<T>
+public interface IExactRing<T> : IAdditiveGroup<T>, IMultiplicativeMonoid<T>
+    where T : IExactRing<T>
 {
-    abstract static T Zero { get; }
-    abstract static T One { get; }
-
     /// <summary>\(\mathbb Z\)-代数同态：FromLong(0)=Zero、FromLong(1)=One，并保持加法/乘法。</summary>
     abstract static T FromLong(long value);
-
-    abstract static T operator +(T a, T b);
-    abstract static T operator -(T a, T b);
-    abstract static T operator -(T a);
-    abstract static T operator *(T a, T b);
 
     /// <summary>sound 但不完备的零判定：StrictlyFalse 才表示已证非零。</summary>
     abstract static StrictResult VerifyZero(T a);
@@ -73,10 +98,9 @@ public interface IIntegralDomain<T> : IExactRing<T> where T : IIntegralDomain<T>
 ///     可计算域：提供三态 <see cref="TryInverse" />。这不是“所有非零元都能判定”的数学域，
 ///     而是带 Unknown / NoSymbolicData 的计算契约。
 /// </summary>
-public interface IComputableField<T> : IIntegralDomain<T> where T : IComputableField<T>
+public interface IComputableField<T> : IIntegralDomain<T>, IMultiplicativeGroup<T>
+    where T : IComputableField<T>
 {
-    /// <summary>StrictlyTrue 时 inverse 满足 a·inverse=One；StrictlyFalse/Unknown 时 inverse 无意义。</summary>
-    static abstract StrictVerdict TryInverse(T a, out T inverse);
 }
 
 /// <summary>可判定符号的环：只要求三态符号，不要求全序/可计算比较。</summary>
@@ -166,7 +190,7 @@ public readonly record struct ExactScalar(double Approx, Entity? Exact) : IExact
             _ => StrictVerdict.NoSymbolicData
         };
 
-    static StrictVerdict IComputableField<ExactScalar>.TryInverse(ExactScalar a, out ExactScalar inverse)
+    static StrictVerdict IMultiplicativeGroup<ExactScalar>.TryInverse(ExactScalar a, out ExactScalar inverse)
     {
         switch (a.VerifyStrictZero())
         {

@@ -72,7 +72,7 @@ public readonly record struct ExactComplex(ExactScalar Re, ExactScalar Im) : IEx
             _ => StrictVerdict.NoSymbolicData
         };
 
-    static StrictVerdict IComputableField<ExactComplex>.TryInverse(ExactComplex a, out ExactComplex inverse)
+    static StrictVerdict IMultiplicativeGroup<ExactComplex>.TryInverse(ExactComplex a, out ExactComplex inverse)
     {
         switch (a.VerifyStrictZero())
         {
