@@ -33,11 +33,8 @@ GeneralizedCircle<T> where T : IComputableField<T>
   \[
   H' = M^{-*} H M^{-1}
   \]
-  作用在 Hermitian 矩阵
-  \[
-  H=\begin{pmatrix}A&B\\C&D\end{pmatrix}
-  \]
-  上。
+  作用在 Hermitian 矩阵 \(H=\begin{pmatrix}A&B\\C&D\end{pmatrix}\) 上。
+- `AntiMobiusMap.Apply(GeneralizedCircle<ExactComplex>)`：先做 \(H\to H^T\)，再套同一公式。
 - `EvalAt(HComplex)`：复广义圆在 CP¹ 点上的取值。
 
 ## 语义接口
@@ -56,11 +53,11 @@ GeneralizedCircle<T> where T : IComputableField<T>
 - 正交圆：单位圆与圆心 \((2,0)\)、半径 \(\sqrt3\) 的圆；
 - 单位反演：单位圆固定；直线 \(x=1\) 反演成 \(x^2+y^2-x=0\)；
 - 一般反演：以 \((1,0)\) 为心、半径 \(1\)，直线 \(x=2\) 反演成以 \((1,0),(2,0)\) 为直径的圆；
-- 复 Möbius：\(z\mapsto z+1\) 把单位圆变成 \(|w-1|=1\)。
+- 复 Möbius：\(z\mapsto z+1\) 把单位圆变成 \(|w-1|=1\)；
+- 反 Möbius 反演：直线 \(x=1\) 变成直径 \([0,1]\) 的圆。
 
 ## 未实现
 
-- `AntiMobiusMap` 对 4 向量的作用；
 - 共轴圆、根轴、圆链；
 - 与 `HComplex` 点模型的完整桥接；
 - 复广义圆的 `Classify`（复数无全序）。

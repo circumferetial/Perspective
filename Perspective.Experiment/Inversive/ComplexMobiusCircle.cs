@@ -12,7 +12,18 @@ public static class ComplexMobiusCircle
 {
     public static Result<GeneralizedCircle<ExactComplex>, GeometryError> Apply(
         this MobiusMap map,
-        GeneralizedCircle<ExactComplex> circle)
+        GeneralizedCircle<ExactComplex> circle) =>
+        Transform(map, circle, anti: false);
+
+    public static Result<GeneralizedCircle<ExactComplex>, GeometryError> Apply(
+        this AntiMobiusMap map,
+        GeneralizedCircle<ExactComplex> circle) =>
+        Transform(map.Map, circle, anti: true);
+
+    private static Result<GeneralizedCircle<ExactComplex>, GeometryError> Transform(
+        MobiusMap map,
+        GeneralizedCircle<ExactComplex> circle,
+        bool anti)
     {
         if (!map.IsInvertible)
             return Result<GeneralizedCircle<ExactComplex>, GeometryError>.Fail(GeometryError.UndefinedParameter);
@@ -33,11 +44,19 @@ public static class ComplexMobiusCircle
             { d, -b },
             { -c, a }
         };
-        var h = new[,]
-        {
-            { circle.A, circle.B },
-            { circle.C, circle.D }
-        };
+
+        // 反莫比乌斯先做一次共轭，等效于 H → Hᵀ。
+        var h = anti
+            ? new[,]
+            {
+                { circle.A, circle.C },
+                { circle.B, circle.D }
+            }
+            : new[,]
+            {
+                { circle.A, circle.B },
+                { circle.C, circle.D }
+            };
 
         var transformed = Multiply(Multiply(left, h), right);
         return Result<GeneralizedCircle<ExactComplex>, GeometryError>.Ok(

@@ -88,6 +88,31 @@ public sealed class InversiveTests
     }
 
     [Fact]
+    public void AntiMobius_Inversion_TransformsLineToCircle()
+    {
+        // 直线 x=1：B=C=1,D=−2；单位圆反演后成直径 [0,1] 的圆。
+        var line = new GeneralizedCircle<ExactComplex>(
+            ExactComplex.Zero,
+            ExactComplex.One,
+            ExactComplex.One,
+            -ExactComplex.FromLong(2));
+
+        var inversion = AntiMobiusMap.FromCircleInversion(
+            ExactComplex.Zero, ExactScalar.One).Value;
+        var image = inversion.Apply(line).Value;
+
+        foreach (var z in new[]
+                 {
+                     ExactComplex.Zero,
+                     ExactComplex.One,
+                     new ExactComplex(ExactScalar.FromInt(1) / ExactScalar.FromInt(2),
+                         ExactScalar.FromInt(1) / ExactScalar.FromInt(2))
+                 })
+            Assert.Equal(StrictResult.StrictlyTrue,
+                image.EvalAt(HComplex.From(z)).VerifyStrictZero());
+    }
+
+    [Fact]
     public void GeneralizedCircle_Orthogonality()
     {
         var unit = GeneralizedCircle<ExactScalar>.FromCircle(Vec2<ExactScalar>.Zero, S(1));
