@@ -18,16 +18,17 @@
 - `Center()` / `RadiusSquared()`
 - `InnerProduct` / `IsOrthogonal`
 - `InvertInUnitCircle()`：交换 A 与 D
+- `InvertInCircle(center, radiusSquared)`：平移 + 缩放 + 单位反演 + 回代
 
 ## 测试
 
 - 圆/线/点圆识别；
 - 正交圆：单位圆与圆心 \((2,0)\)、半径 \(\sqrt3\) 的圆；
-- 单位反演：单位圆固定；直线 \(x=1\) 反演成 \(x^2+y^2-x=0\)。
+- 单位反演：单位圆固定；直线 \(x=1\) 反演成 \(x^2+y^2-x=0\)；
+- 一般反演：以 \((1,0)\) 为心、半径 \(1\)，直线 \(x=2\) 反演成以 \((1,0),(2,0)\) 为直径的圆。
 
 ## 未实现
 
-- 一般圆反演（任意中心/半径）；
 - 复系数广义圆；
 - `MobiusMap` / `AntiMobiusMap` 对 4 向量的作用；
 - 共轴圆、根轴、圆链；
@@ -37,4 +38,4 @@
 
 - 目前只做**实**广义圆，不做复系数；
 - 不把 Inversive 塞进 `Subspace`；
-- 下一步优先做一般圆反演与 `MobiusMap` 作用。
+- 下一步优先做 `MobiusMap` 作用（需要复系数表示）。

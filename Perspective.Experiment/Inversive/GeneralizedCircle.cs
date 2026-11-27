@@ -84,6 +84,46 @@ public readonly record struct GeneralizedCircle(ExactScalar A, ExactScalar B, Ex
     /// <summary>单位圆反演：交换 A 与 D。直线不过原点 ↔ 过原点的圆。</summary>
     public GeneralizedCircle InvertInUnitCircle() => new(D, B, C, A);
 
+    /// <summary>以 center 为心、radiusSquared 为半径² 的反演。</summary>
+    public Result<GeneralizedCircle, GeometryError> InvertInCircle(
+        Vec2<ExactScalar> center,
+        ExactScalar radiusSquared)
+    {
+        if (radiusSquared.VerifyStrictZero() == StrictResult.StrictlyTrue
+            || radiusSquared.Approx < 0)
+            return Result<GeneralizedCircle, GeometryError>.Fail(GeometryError.UndefinedParameter);
+
+        // 平移到圆心：x = u + h, y = v + k。
+        var shifted = new GeneralizedCircle(
+            A,
+            ExactScalar.FromInt(2) * A * center.X + B,
+            ExactScalar.FromInt(2) * A * center.Y + C,
+            A * center.Dot(center) + B * center.X + C * center.Y + D);
+
+        // 归一化到单位圆：u = x'/r, v = y'/r。
+        var radius = ExactScalar.Sqrt(radiusSquared);
+        var normalized = new GeneralizedCircle(
+            shifted.A,
+            shifted.B / radius,
+            shifted.C / radius,
+            shifted.D / radiusSquared);
+
+        // 单位反演后，再缩放回半径 r。
+        var inverted = normalized.InvertInUnitCircle();
+        var scaled = new GeneralizedCircle(
+            inverted.A,
+            inverted.B * radius,
+            inverted.C * radius,
+            inverted.D * radiusSquared);
+
+        // 平移回原坐标系。
+        return Result<GeneralizedCircle, GeometryError>.Ok(new GeneralizedCircle(
+            scaled.A,
+            scaled.B - ExactScalar.FromInt(2) * scaled.A * center.X,
+            scaled.C - ExactScalar.FromInt(2) * scaled.A * center.Y,
+            scaled.A * center.Dot(center) - scaled.B * center.X - scaled.C * center.Y + scaled.D));
+    }
+
     private static bool IsZero(ExactScalar x) =>
         x.VerifyStrictZero() == StrictResult.StrictlyTrue;
 }

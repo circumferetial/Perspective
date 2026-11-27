@@ -45,6 +45,25 @@ public sealed class InversiveTests
     }
 
     [Fact]
+    public void GeneralizedCircle_GeneralInversion()
+    {
+        // 以 (1,0) 为心、半径 1 反演直线 x=2：
+        // 直线距心 1，切于 (2,0)，反演成以 (1,0),(2,0) 为直径的圆。
+        var line = GeneralizedCircle.FromLine(S(1), S(0), S(-2));
+        var inverted = line.InvertInCircle(
+            new Vec2<ExactScalar>(S(1), S(0)), S(1)).Value;
+
+        Assert.Equal(GeneralizedCircleKind.Circle, inverted.Kind);
+        Assert.Equal(StrictResult.StrictlyTrue,
+            inverted.Eval(new Vec2<ExactScalar>(S(1), S(0))).VerifyStrictZero());
+        Assert.Equal(StrictResult.StrictlyTrue,
+            inverted.Eval(new Vec2<ExactScalar>(S(2), S(0))).VerifyStrictZero());
+        Assert.Equal(StrictResult.StrictlyTrue,
+            inverted.Eval(new Vec2<ExactScalar>(S(3) / S(2), S(1) / S(2)))
+                .VerifyStrictZero());
+    }
+
+    [Fact]
     public void GeneralizedCircle_Orthogonality()
     {
         var unit = GeneralizedCircle.FromCircle(Vec2<ExactScalar>.Zero, S(1));
