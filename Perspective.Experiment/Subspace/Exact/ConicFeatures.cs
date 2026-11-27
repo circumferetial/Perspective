@@ -20,6 +20,15 @@ public static class ConicFeatures
         var zero = ExactScalar.Zero;
         if (q.Q01.VerifyStrictZero() != StrictResult.StrictlyTrue)
             return Result<ConicFoci, GeometryError>.Fail(GeometryError.UndefinedParameter);
+
+        // 抛物线：Q00=0（水平轴）或 Q11=0（竖直轴）。
+        if (q.Q00.VerifyStrictZero() == StrictResult.StrictlyTrue
+            && q.Q11.VerifyStrictZero() != StrictResult.StrictlyTrue)
+            return ParabolaFoci(q, horizontalAxis: true);
+        if (q.Q11.VerifyStrictZero() == StrictResult.StrictlyTrue
+            && q.Q00.VerifyStrictZero() != StrictResult.StrictlyTrue)
+            return ParabolaFoci(q, horizontalAxis: false);
+
         if (q.Q00.VerifyStrictZero() == StrictResult.StrictlyTrue
             || q.Q11.VerifyStrictZero() == StrictResult.StrictlyTrue)
             return Result<ConicFoci, GeometryError>.Fail(GeometryError.UndefinedParameter);
@@ -99,6 +108,93 @@ public static class ConicFeatures
 
         return Result<ConicFoci, GeometryError>.Ok(new ConicFoci(
             ConicKind.Hyperbola, center, h1, h2, tc / ta));
+    }
+
+    /// <summary>椭圆/双曲线两条准线；抛物线一条；圆没有有限准线。</summary>
+    public static Result<IReadOnlyList<Dual3<ExactScalar>>, GeometryError> Directrices(
+        this BilinearForm3<ExactScalar> q)
+    {
+        var fociResult = q.Foci();
+        if (!fociResult.TryGet(out var data))
+            return Result<IReadOnlyList<Dual3<ExactScalar>>, GeometryError>.Fail(fociResult.Error);
+
+        if (data.Kind == ConicKind.Circle)
+            return Result<IReadOnlyList<Dual3<ExactScalar>>, GeometryError>.Ok([]);
+
+        if (data.Kind == ConicKind.Parabola)
+        {
+            var dx = data.Focus1.X - data.Center.X;
+            var dy = data.Focus1.Y - data.Center.Y;
+            var line = Math.Abs(dx.Approx) >= Math.Abs(dy.Approx)
+                ? new Dual3<ExactScalar>(ExactScalar.One, ExactScalar.Zero,
+                    -(data.Center.X - dx))
+                : new Dual3<ExactScalar>(ExactScalar.Zero, ExactScalar.One,
+                    -(data.Center.Y - dy));
+            return Result<IReadOnlyList<Dual3<ExactScalar>>, GeometryError>.Ok([line]);
+        }
+
+        var e = data.Eccentricity;
+        if (e.VerifyStrictZero() == StrictResult.StrictlyTrue)
+            return Result<IReadOnlyList<Dual3<ExactScalar>>, GeometryError>.Fail(GeometryError.UndefinedParameter);
+
+        var fx = data.Focus1.X - data.Center.X;
+        var fy = data.Focus1.Y - data.Center.Y;
+        var c = ExactScalar.Sqrt(fx * fx + fy * fy);
+        var distance = c / (e * e);
+
+        var lines = Math.Abs(fx.Approx) >= Math.Abs(fy.Approx)
+            ? new[]
+            {
+                new Dual3<ExactScalar>(ExactScalar.One, ExactScalar.Zero, -(data.Center.X + distance)),
+                new Dual3<ExactScalar>(ExactScalar.One, ExactScalar.Zero, -(data.Center.X - distance))
+            }
+            : new[]
+            {
+                new Dual3<ExactScalar>(ExactScalar.Zero, ExactScalar.One, -(data.Center.Y + distance)),
+                new Dual3<ExactScalar>(ExactScalar.Zero, ExactScalar.One, -(data.Center.Y - distance))
+            };
+
+        return Result<IReadOnlyList<Dual3<ExactScalar>>, GeometryError>.Ok(lines);
+    }
+
+    private static Result<ConicFoci, GeometryError> ParabolaFoci(
+        BilinearForm3<ExactScalar> q,
+        bool horizontalAxis)
+    {
+        if (horizontalAxis)
+        {
+            // A y² + 2B x + 2C y + D = 0
+            var a = q.Q11;
+            var b = q.Q02;
+            var cc = q.Q12;
+            var d = q.Q22;
+            if (b.VerifyStrictZero() == StrictResult.StrictlyTrue)
+                return Result<ConicFoci, GeometryError>.Fail(GeometryError.UndefinedParameter);
+
+            var k = -cc / a;
+            var h = (cc * cc - a * d) / (ExactScalar.FromInt(2) * a * b);
+            var p = -b / (ExactScalar.FromInt(2) * a);
+            var vertex = new Primal3<ExactScalar>(h, k, ExactScalar.One);
+            var focus = new Primal3<ExactScalar>(h + p, k, ExactScalar.One);
+            return Result<ConicFoci, GeometryError>.Ok(new ConicFoci(
+                ConicKind.Parabola, vertex, focus, focus, ExactScalar.One));
+        }
+
+        // A x² + 2B x + 2C y + D = 0
+        var aa = q.Q00;
+        var bb = q.Q02;
+        var c2 = q.Q12;
+        var dd = q.Q22;
+        if (c2.VerifyStrictZero() == StrictResult.StrictlyTrue)
+            return Result<ConicFoci, GeometryError>.Fail(GeometryError.UndefinedParameter);
+
+        var hh = -bb / aa;
+        var kk = (bb * bb - aa * dd) / (ExactScalar.FromInt(2) * aa * c2);
+        var pp = -c2 / (ExactScalar.FromInt(2) * aa);
+        var vertex2 = new Primal3<ExactScalar>(hh, kk, ExactScalar.One);
+        var focus2 = new Primal3<ExactScalar>(hh, kk + pp, ExactScalar.One);
+        return Result<ConicFoci, GeometryError>.Ok(new ConicFoci(
+            ConicKind.Parabola, vertex2, focus2, focus2, ExactScalar.One));
     }
 
     private static int Sign(ExactScalar x)

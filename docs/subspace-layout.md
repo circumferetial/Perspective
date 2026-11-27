@@ -21,6 +21,7 @@
 
 - `ExactGeometryOps.cs`：除法、`Sqrt`、`Approx`、`CrossRatio`、`ConicIntersection` 等。
 - `ConicKind.cs`：实仿射 conic 分类。
+- `ConicFeatures.cs`：轴对齐 conic 的焦点/中心/离心率/准线。
 - `ConicFrame.cs`：标准抛物线参数 \(t\) 的 Möbius 归一化。
 
 特点：依赖 `ExactScalar`，可以做除法、开方和数值守卫。

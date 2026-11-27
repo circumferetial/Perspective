@@ -1230,6 +1230,54 @@ public class SubspaceTests
     }
 
     [Fact]
+    public void ConicFoci_And_Directrices_Parabola()
+    {
+        // y²=4x
+        var y2 = new BilinearForm3<ExactScalar>(
+            S(0), S(0), S(-2),
+            S(1), S(0), S(0));
+        var yf = y2.Foci().Value;
+        Assert.Equal(ConicKind.Parabola, yf.Kind);
+        Assert.Equal(1.0, yf.Focus1.X.Approx, 10);
+        Assert.Equal(0.0, yf.Focus1.Y.Approx, 10);
+
+        var yd = y2.Directrices().Value;
+        Assert.Single(yd);
+        Assert.Equal(StrictResult.StrictlyTrue,
+            SubspaceAlgebra.Pair(yd[0], Primal3<ExactScalar>.Fixed(-1, 0)).VerifyStrictZero());
+
+        // x²=4y
+        var x2 = new BilinearForm3<ExactScalar>(
+            S(1), S(0), S(0),
+            S(0), S(-2), S(0));
+        var xf = x2.Foci().Value;
+        Assert.Equal(0.0, xf.Focus1.X.Approx, 10);
+        Assert.Equal(1.0, xf.Focus1.Y.Approx, 10);
+
+        var xd = x2.Directrices().Value;
+        Assert.Single(xd);
+        Assert.Equal(StrictResult.StrictlyTrue,
+            SubspaceAlgebra.Pair(xd[0], Primal3<ExactScalar>.Fixed(0, -1)).VerifyStrictZero());
+
+        // 椭圆 x²/4+y²/3=1 的准线 x=±4
+        var ellipse = new BilinearForm3<ExactScalar>(
+            S(1) / S(4), S(0), S(0),
+            S(1) / S(3), S(0), S(-1));
+        var ed = ellipse.Directrices().Value;
+        Assert.Equal(2, ed.Count);
+        Assert.True(
+            SubspaceAlgebra.Pair(ed[0], Primal3<ExactScalar>.Fixed(4, 0)).VerifyStrictZero()
+                == StrictResult.StrictlyTrue
+            || SubspaceAlgebra.Pair(ed[0], Primal3<ExactScalar>.Fixed(-4, 0)).VerifyStrictZero()
+                == StrictResult.StrictlyTrue);
+        Assert.True(
+            SubspaceAlgebra.Pair(ed[1], Primal3<ExactScalar>.Fixed(4, 0)).VerifyStrictZero()
+                == StrictResult.StrictlyTrue
+            || SubspaceAlgebra.Pair(ed[1], Primal3<ExactScalar>.Fixed(-4, 0)).VerifyStrictZero()
+                == StrictResult.StrictlyTrue);
+    }
+
+    [Fact]
     public void Result_DefaultIsFailure()
     {
         var failed = default(Result<int, GeometryError>);

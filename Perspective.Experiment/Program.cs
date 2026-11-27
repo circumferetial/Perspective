@@ -54,6 +54,7 @@ public static class Program
             Subspace.Benchmarks.ProjectiveBenchmarks.SymbolicDegenerateBrianchon();
             Subspace.Benchmarks.ProjectiveBenchmarks.FrameInvariantHarmonicCrossRatio();
             Subspace.Benchmarks.ProjectiveBenchmarks.FrameInvariantDegeneratePascal();
+            Subspace.Benchmarks.ProjectiveBenchmarks.FrameInvariantDegenerateBrianchon();
             return;
         }
 

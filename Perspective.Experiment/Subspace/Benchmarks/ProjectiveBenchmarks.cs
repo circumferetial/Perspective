@@ -343,6 +343,62 @@ public static class ProjectiveBenchmarks
         return new BenchmarkResult("PR-2F", "X1Y1、X2Y2、AB 共点", "ConicFrame + Pascal", ok, detail, sw.ElapsedMilliseconds);
     }
 
+    public static BenchmarkResult FrameInvariantDegenerateBrianchon()
+    {
+        var sw = Stopwatch.StartNew();
+
+        // 任意 E=P(−1),F=P(2),G=P(5),H=P(7)。
+        var e = Primal3<ExactScalar>.Fixed(1, -1);
+        var f = Primal3<ExactScalar>.Fixed(4, 2);
+        var g = Primal3<ExactScalar>.Fixed(25, 5);
+        var h = Primal3<ExactScalar>.Fixed(49, 7);
+
+        // 先把 E,F,G 送到 0,1,∞；再用 2t/(t+1) 把 ∞ 送到 2。
+        var first = ConicFrame.FromThreeParameters(
+            ExactScalar.FromInt(-1),
+            ExactScalar.FromInt(2),
+            ExactScalar.FromInt(5)).Value;
+        var second = new ConicFrame(
+            ExactScalar.FromInt(2), ExactScalar.Zero,
+            ExactScalar.One, ExactScalar.One);
+        var frame = second.Compose(first).Value;
+
+        var e2 = frame.ApplyPoint(e).Value;
+        var f2 = frame.ApplyPoint(f).Value;
+        var g2 = frame.ApplyPoint(g).Value;
+        var h2 = frame.ApplyPoint(h).Value;
+
+        var conic = new BilinearForm3<ExactScalar>(
+            ExactScalar.Zero,
+            ExactScalar.Zero,
+            -ExactScalar.FromInt(1) / ExactScalar.FromInt(2),
+            ExactScalar.One,
+            ExactScalar.Zero,
+            ExactScalar.Zero);
+
+        var te = conic.Polar(e2);
+        var tf = conic.Polar(f2);
+        var tg = conic.Polar(g2);
+        var th = conic.Polar(h2);
+
+        var r = SubspaceAlgebra.Meet(te, tg);
+        var s = SubspaceAlgebra.Meet(th, tf);
+        var m = SubspaceAlgebra.Meet(SubspaceAlgebra.Join(e2, f2), SubspaceAlgebra.Join(g2, h2));
+        var n = SubspaceAlgebra.Meet(SubspaceAlgebra.Join(f2, g2), SubspaceAlgebra.Join(h2, e2));
+
+        var rsm = SubspaceAlgebra.AreCollinear(r, s, m);
+        var rsn = SubspaceAlgebra.AreCollinear(r, s, n);
+        var ok = rsm.TryGet(out var v1) && v1 == StrictResult.StrictlyTrue
+                  && rsn.TryGet(out var v2) && v2 == StrictResult.StrictlyTrue;
+        sw.Stop();
+        var detail = ok
+            ? "ConicFrame 复合归一化后，R,S,M,N 仍共线"
+            : "归一化后四点不共线";
+
+        Console.WriteLine($"[PR-1F] {(ok ? "PASS" : "FAIL")}  {sw.ElapsedMilliseconds,4}ms  {detail}");
+        return new BenchmarkResult("PR-1F", "R,S,M,N 共线", "ConicFrame + Brianchon", ok, detail, sw.ElapsedMilliseconds);
+    }
+
     private static Result<ExactScalar, GeometryError> CrossRatioOnUv(
         Primal3<ExactScalar> u,
         Primal3<ExactScalar> v,
