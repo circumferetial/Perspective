@@ -796,6 +796,14 @@ internal static class UniPoly
         return a[..(n + 1)];
     }
 
+    public static ExactScalar[] TrimStrict(ExactScalar[] a)
+    {
+        if (a.Length == 0) return [ExactScalar.Zero];
+        var n = a.Length - 1;
+        while (n > 0 && a[n].VerifyStrictZero() == StrictResult.StrictlyTrue) n--;
+        return a[..(n + 1)];
+    }
+
     public static bool IsZero(ExactScalar[] a) => a.Length == 1 && a[0].IsZeroWithFallback();
 
     public static ExactScalar[] FromPolyExpr(PolyExpr p, int varId)
@@ -1291,7 +1299,7 @@ public static class IntervalRange
         bool rightClosed,
         params ExactScalar[] excluded)
     {
-        if (left.Approx > right.Approx)
+        if (Compare(left, right) > 0)
             throw new ArgumentException("区间左端点大于右端点。", nameof(left));
 
         var coeffs = UniPoly.FromPolyExpr(polynomial, varId);
@@ -1302,7 +1310,7 @@ public static class IntervalRange
         };
 
         foreach (var root in RootsUpToQuadratic(UniPoly.Derivative(coeffs)))
-            if (root.Approx > left.Approx && root.Approx < right.Approx)
+            if (Compare(root, left) > 0 && Compare(root, right) < 0)
                 candidates.Add(new RangeBound(
                     UniPoly.Evaluate(coeffs, root),
                     !IsExcluded(root, excluded),
@@ -1323,15 +1331,17 @@ public static class IntervalRange
 
     private static List<ExactScalar> RootsUpToQuadratic(ExactScalar[] p)
     {
-        p = UniPoly.Trim(p);
+        p = UniPoly.TrimStrict(p);
         var deg = p.Length - 1;
         if (deg <= 0) return [];
         if (deg == 1) return [-p[0] / p[1]];
         if (deg > 2) throw new NotSupportedException($"IntervalRange v1 只支持二次导数，当前 {deg}。");
 
         var disc = p[1] * p[1] - ExactScalar.FromInt(4) * p[2] * p[0];
-        if (disc.Approx < 0 && !disc.IsNumericallyZero(1e-9)) return [];
-        if (disc.IsNumericallyZero(1e-9)) return [-p[1] / (ExactScalar.FromInt(2) * p[2])];
+        if (ExactScalar.TrySign(disc, out var sign) != StrictVerdict.StrictlyTrue)
+            throw new NotSupportedException("IntervalRange：判别式符号未证明。");
+        if (sign < 0) return [];
+        if (sign == 0) return [-p[1] / (ExactScalar.FromInt(2) * p[2])];
 
         var sqrt = ExactScalar.Sqrt(disc);
         var twoA = ExactScalar.FromInt(2) * p[2];
@@ -1339,10 +1349,16 @@ public static class IntervalRange
     }
 
     private static bool IsExcluded(ExactScalar value, ExactScalar[] excluded) =>
-        excluded.Any(e => Near(e, value));
+        excluded.Any(e => Compare(e, value) == 0);
 
-    private static bool Near(ExactScalar a, ExactScalar b) =>
-        Math.Abs(a.Approx - b.Approx) < 1e-9;
+    private static bool Near(ExactScalar a, ExactScalar b) => Compare(a, b) == 0;
+
+    private static int Compare(ExactScalar a, ExactScalar b)
+    {
+        if (ExactScalar.TrySign(a - b, out var sign) != StrictVerdict.StrictlyTrue)
+            throw new NotSupportedException("IntervalRange：端点/根的序未证明。");
+        return sign;
+    }
 }
 
 public static class RationalRangeApprox
