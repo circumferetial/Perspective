@@ -78,12 +78,43 @@ public interface IComputableField<T> : IIntegralDomain<T> where T : IComputableF
     /// <summary>StrictlyTrue 时 inverse 满足 a·inverse=One；StrictlyFalse/Unknown 时 inverse 无意义。</summary>
     static abstract StrictVerdict TryInverse(T a, out T inverse);
 }
+
+/// <summary>可判定符号的环：只要求三态符号，不要求全序/可计算比较。</summary>
+public interface IOrderedRing<T> : IExactRing<T> where T : IOrderedRing<T>
+{
+    /// <summary>-1 / 0 / +1；返回 0 必须已有零证明。</summary>
+    static abstract int Sign(T value);
+}
+
+/// <summary>可计算域 + 符号，组合成“实域”语义。</summary>
+public interface IRealField<T> : IComputableField<T>, IOrderedRing<T>
+    where T : IRealField<T>
+{
+}
+
+/// <summary>可开方：StrictlyTrue 时 root²=value 已确认。</summary>
+public interface ISqrtable<T> : IExactRing<T> where T : ISqrtable<T>
+{
+    static abstract StrictVerdict TrySqrt(T value, out T root);
+}
+
+/// <summary>实域 + 开方，组合成“实闭/可开方实域”语义。</summary>
+public interface IRealSqrtField<T> : IRealField<T>, ISqrtable<T>
+    where T : IRealSqrtField<T>
+{
+}
+
+/// <summary>近似值能力；只供数值守卫/候选选择，不进入正确性判定。</summary>
+public interface IApproxable<T> : IExactRing<T> where T : IApproxable<T>
+{
+    static abstract double Approx(T value);
+}
 /// <summary>
 /// 双轨数字：同时携带“double 近似值”和“AngouriMath 精确代数基因”。
 /// 注意：record struct 默认的 == 为表达式树结构相等，判数学相等请使用
 /// <see cref="AreStrictlyEqual"/> 或 <c>(a - b).VerifyStrictZero()</c>。
 /// </summary>
-public readonly record struct ExactScalar(double Approx, Entity? Exact) : IExactRing<ExactScalar>, IComputableField<ExactScalar>
+public readonly record struct ExactScalar(double Approx, Entity? Exact) : IExactRing<ExactScalar>, IComputableField<ExactScalar>, IRealSqrtField<ExactScalar>, IApproxable<ExactScalar>
 {
     public static ExactScalar Zero => FromInt(0);
     public static ExactScalar One => FromInt(1);
@@ -153,6 +184,30 @@ public readonly record struct ExactScalar(double Approx, Entity? Exact) : IExact
                 return StrictVerdict.NoSymbolicData;
         }
     }
+
+    static int IOrderedRing<ExactScalar>.Sign(ExactScalar value)
+    {
+        if (value.VerifyStrictZero() == StrictResult.StrictlyTrue) return 0;
+        return value.Approx >= 0 ? 1 : -1;
+    }
+
+    static StrictVerdict ISqrtable<ExactScalar>.TrySqrt(ExactScalar value, out ExactScalar root)
+    {
+        var sign = value.VerifyStrictZero() == StrictResult.StrictlyTrue
+            ? 0
+            : value.Approx >= 0 ? 1 : -1;
+
+        if (sign < 0)
+        {
+            root = default;
+            return StrictVerdict.StrictlyFalse;
+        }
+
+        root = sign == 0 ? Zero : Sqrt(value);
+        return StrictVerdict.StrictlyTrue;
+    }
+
+    static double IApproxable<ExactScalar>.Approx(ExactScalar value) => value.Approx;
 
     /// <summary>在关键节点折叠表达式树，防止雪球膨胀</summary>
     public ExactScalar Simplified() => Exact is null ? this : this with { Exact = Exact.Simplify() };

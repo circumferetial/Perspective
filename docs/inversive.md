@@ -7,18 +7,26 @@
 `Perspective.Experiment/Inversive/GeneralizedCircle.cs`
 
 ```text
+GeneralizedCircle<T> where T : IComputableField<T>
 [A,B,C,D] 表示 A(x²+y²)+Bx+Cy+D=0
 ```
 
-- `FromCircle(center, radiusSquared)`
-- `FromLine(b,c,d)`
-- `FromPoint(point)`（点圆）
-- `Kind`：Circle / Line / Point / Imaginary / Empty
-- `Eval(point)`
-- `Center()` / `RadiusSquared()`
-- `InnerProduct` / `IsOrthogonal`
-- `InvertInUnitCircle()`：交换 A 与 D
-- `InvertInCircle(center, radiusSquared)`：平移 + 缩放 + 单位反演 + 回代
+- 存储/求值/正交/反演只需 `IComputableField<T>`；
+- `Classify()` 额外要求 `IRealField<T>`（能判符号）；
+- 反演只做域逆，不需要开方。
+
+## 语义接口
+
+`Perspective.Core.Math`
+
+- `IComputableField<T>`：域逆；
+- `IOrderedRing<T>`：三态符号；
+- `IRealField<T>`：`IComputableField + IOrderedRing`；
+- `ISqrtable<T>`：开方；
+- `IRealSqrtField<T>`：实域 + 开方；
+- `IApproxable<T>`：近似值，仅守卫。
+
+组合接口只组合语义，不新增约定。
 
 ## 测试
 

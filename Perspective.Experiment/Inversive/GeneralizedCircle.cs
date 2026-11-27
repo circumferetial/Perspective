@@ -13,117 +13,116 @@ public enum GeneralizedCircleKind
 }
 
 /// <summary>
-///     实广义圆：[A,B,C,D] 表示 A(x²+y²)+Bx+Cy+D=0。
+///     广义圆：[A,B,C,D] 表示 A(x²+y²)+Bx+Cy+D=0。
 ///     A=0 为直线；判别式 B²+C²−4AD 决定圆、点圆、虚圆。
+///     只要求可计算域；符号分类额外要求 IRealField。
 /// </summary>
-public readonly record struct GeneralizedCircle(ExactScalar A, ExactScalar B, ExactScalar C, ExactScalar D)
+public readonly record struct GeneralizedCircle<T>(T A, T B, T C, T D)
+    where T : IComputableField<T>
 {
-    public static GeneralizedCircle FromCircle(Vec2<ExactScalar> center, ExactScalar radiusSquared) =>
-        new(ExactScalar.One,
-            -ExactScalar.FromInt(2) * center.X,
-            -ExactScalar.FromInt(2) * center.Y,
+    private static T Two => T.FromLong(2);
+
+    public static GeneralizedCircle<T> FromCircle(Vec2<T> center, T radiusSquared) =>
+        new(T.One,
+            -Two * center.X,
+            -Two * center.Y,
             center.Dot(center) - radiusSquared);
 
-    public static GeneralizedCircle FromLine(ExactScalar b, ExactScalar c, ExactScalar d) =>
-        new(ExactScalar.Zero, b, c, d);
+    public static GeneralizedCircle<T> FromLine(T b, T c, T d) =>
+        new(T.Zero, b, c, d);
 
-    public static GeneralizedCircle FromPoint(Vec2<ExactScalar> point) =>
-        new(ExactScalar.One,
-            -ExactScalar.FromInt(2) * point.X,
-            -ExactScalar.FromInt(2) * point.Y,
-            point.Dot(point));
+    public static GeneralizedCircle<T> FromPoint(Vec2<T> point) =>
+        new(T.One, -Two * point.X, -Two * point.Y, point.Dot(point));
 
-    public GeneralizedCircleKind Kind
-    {
-        get
-        {
-            if (IsZero(A))
-                return IsZero(B) && IsZero(C) ? GeneralizedCircleKind.Empty : GeneralizedCircleKind.Line;
-
-            var discriminant = B * B + C * C - ExactScalar.FromInt(4) * A * D;
-            if (IsZero(discriminant)) return GeneralizedCircleKind.Point;
-            return discriminant.Approx > 0 ? GeneralizedCircleKind.Circle : GeneralizedCircleKind.Imaginary;
-        }
-    }
-
-    public bool IsLine => Kind == GeneralizedCircleKind.Line;
-    public bool IsCircle => Kind is GeneralizedCircleKind.Circle or GeneralizedCircleKind.Point;
-
-    public ExactScalar Eval(Vec2<ExactScalar> p) =>
+    public T Eval(Vec2<T> p) =>
         A * p.Dot(p) + B * p.X + C * p.Y + D;
 
-    public Result<Vec2<ExactScalar>, GeometryError> Center()
+    public Result<Vec2<T>, GeometryError> Center()
     {
         if (IsZero(A))
-            return Result<Vec2<ExactScalar>, GeometryError>.Fail(GeometryError.AtInfinity);
+            return Result<Vec2<T>, GeometryError>.Fail(GeometryError.AtInfinity);
+        if (T.TryInverse(Two * A, out var inv) != StrictVerdict.StrictlyTrue)
+            return Result<Vec2<T>, GeometryError>.Fail(GeometryError.UndefinedParameter);
 
-        var twoA = ExactScalar.FromInt(2) * A;
-        return Result<Vec2<ExactScalar>, GeometryError>.Ok(
-            new Vec2<ExactScalar>(-B / twoA, -C / twoA));
+        return Result<Vec2<T>, GeometryError>.Ok(new Vec2<T>(-B * inv, -C * inv));
     }
 
-    public Result<ExactScalar, GeometryError> RadiusSquared()
+    public Result<T, GeometryError> RadiusSquared()
     {
-        if (IsZero(A))
-            return Result<ExactScalar, GeometryError>.Fail(GeometryError.AtInfinity);
+        var center = Center();
+        if (!center.TryGet(out var c))
+            return Result<T, GeometryError>.Fail(center.Error);
+        if (T.TryInverse(A, out var invA) != StrictVerdict.StrictlyTrue)
+            return Result<T, GeometryError>.Fail(GeometryError.UndefinedParameter);
 
-        var twoA = ExactScalar.FromInt(2) * A;
-        var center = new Vec2<ExactScalar>(-B / twoA, -C / twoA);
-        return Result<ExactScalar, GeometryError>.Ok(center.Dot(center) - D / A);
+        return Result<T, GeometryError>.Ok(c.Dot(c) - D * invA);
     }
 
     /// <summary>两广义圆的极化内积为零 ⇔ 正交（圆/线统一公式）。</summary>
-    public ExactScalar InnerProduct(GeneralizedCircle other) =>
+    public T InnerProduct(GeneralizedCircle<T> other) =>
         B * other.B + C * other.C
-        - ExactScalar.FromInt(2) * A * other.D
-        - ExactScalar.FromInt(2) * other.A * D;
+        - Two * A * other.D
+        - Two * other.A * D;
 
-    public bool IsOrthogonal(GeneralizedCircle other) =>
+    public bool IsOrthogonal(GeneralizedCircle<T> other) =>
         IsZero(InnerProduct(other));
 
     /// <summary>单位圆反演：交换 A 与 D。直线不过原点 ↔ 过原点的圆。</summary>
-    public GeneralizedCircle InvertInUnitCircle() => new(D, B, C, A);
+    public GeneralizedCircle<T> InvertInUnitCircle() => new(D, B, C, A);
 
-    /// <summary>以 center 为心、radiusSquared 为半径² 的反演。</summary>
-    public Result<GeneralizedCircle, GeometryError> InvertInCircle(
-        Vec2<ExactScalar> center,
-        ExactScalar radiusSquared)
+    /// <summary>以 center 为心、radiusSquared 为半径² 的反演；只需域逆，不需开方。</summary>
+    public Result<GeneralizedCircle<T>, GeometryError> InvertInCircle(
+        Vec2<T> center,
+        T radiusSquared)
     {
-        if (radiusSquared.VerifyStrictZero() == StrictResult.StrictlyTrue
-            || radiusSquared.Approx < 0)
-            return Result<GeneralizedCircle, GeometryError>.Fail(GeometryError.UndefinedParameter);
+        if (IsZero(radiusSquared))
+            return Result<GeneralizedCircle<T>, GeometryError>.Fail(GeometryError.UndefinedParameter);
+        if (T.TryInverse(radiusSquared, out var invR) != StrictVerdict.StrictlyTrue)
+            return Result<GeneralizedCircle<T>, GeometryError>.Fail(GeometryError.UndefinedParameter);
 
-        // 平移到圆心：x = u + h, y = v + k。
-        var shifted = new GeneralizedCircle(
+        var shifted = new GeneralizedCircle<T>(
             A,
-            ExactScalar.FromInt(2) * A * center.X + B,
-            ExactScalar.FromInt(2) * A * center.Y + C,
+            Two * A * center.X + B,
+            Two * A * center.Y + C,
             A * center.Dot(center) + B * center.X + C * center.Y + D);
 
-        // 归一化到单位圆：u = x'/r, v = y'/r。
-        var radius = ExactScalar.Sqrt(radiusSquared);
-        var normalized = new GeneralizedCircle(
-            shifted.A,
-            shifted.B / radius,
-            shifted.C / radius,
-            shifted.D / radiusSquared);
+        var a4 = shifted.D * invR;
+        var b4 = shifted.B - Two * a4 * center.X;
+        var c4 = shifted.C - Two * a4 * center.Y;
+        var d4 = a4 * center.Dot(center) - shifted.B * center.X - shifted.C * center.Y + A * radiusSquared;
 
-        // 单位反演后，再缩放回半径 r。
-        var inverted = normalized.InvertInUnitCircle();
-        var scaled = new GeneralizedCircle(
-            inverted.A,
-            inverted.B * radius,
-            inverted.C * radius,
-            inverted.D * radiusSquared);
-
-        // 平移回原坐标系。
-        return Result<GeneralizedCircle, GeometryError>.Ok(new GeneralizedCircle(
-            scaled.A,
-            scaled.B - ExactScalar.FromInt(2) * scaled.A * center.X,
-            scaled.C - ExactScalar.FromInt(2) * scaled.A * center.Y,
-            scaled.A * center.Dot(center) - scaled.B * center.X - scaled.C * center.Y + scaled.D));
+        return Result<GeneralizedCircle<T>, GeometryError>.Ok(new GeneralizedCircle<T>(a4, b4, c4, d4));
     }
 
-    private static bool IsZero(ExactScalar x) =>
-        x.VerifyStrictZero() == StrictResult.StrictlyTrue;
+    private static bool IsZero(T x) =>
+        T.VerifyZero(x) == StrictResult.StrictlyTrue;
+}
+
+public static class GeneralizedCircleClassify
+{
+    public static GeneralizedCircleKind Classify<T>(this GeneralizedCircle<T> c)
+        where T : IRealField<T>
+    {
+        if (IsZero(c.A))
+            return IsZero(c.B) && IsZero(c.C)
+                ? GeneralizedCircleKind.Empty
+                : GeneralizedCircleKind.Line;
+
+        var discriminant = c.B * c.B + c.C * c.C - T.FromLong(4) * c.A * c.D;
+        return T.Sign(discriminant) switch
+        {
+            < 0 => GeneralizedCircleKind.Imaginary,
+            0 => GeneralizedCircleKind.Point,
+            _ => GeneralizedCircleKind.Circle
+        };
+    }
+
+    public static bool IsLine<T>(this GeneralizedCircle<T> c) where T : IRealField<T> =>
+        c.Classify() == GeneralizedCircleKind.Line;
+
+    public static bool IsCircle<T>(this GeneralizedCircle<T> c) where T : IRealField<T> =>
+        c.Classify() is GeneralizedCircleKind.Circle or GeneralizedCircleKind.Point;
+
+    private static bool IsZero<T>(T x) where T : IRealField<T> =>
+        T.VerifyZero(x) == StrictResult.StrictlyTrue;
 }
