@@ -188,6 +188,14 @@ public class SubspaceTests
     }
 
     [Fact]
+    public void Benchmarks_AllPass()
+    {
+        var results = Program.RunBenchmarks();
+        Assert.Equal(31, results.Count);
+        Assert.All(results, r => Assert.True(r.Passed, $"{r.Id}: {r.Detail}"));
+    }
+
+    [Fact]
     public void ProblemSet5_AllPass()
     {
         var results = ProblemSet5.RunAll();

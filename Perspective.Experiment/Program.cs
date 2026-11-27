@@ -1,5 +1,6 @@
 using Perspective.Core.Geometry;
 using Perspective.Core.Math;
+using Perspective.Experiment.Subspace.Benchmarks;
 
 namespace Perspective.Experiment;
 
@@ -39,23 +40,28 @@ public static class Incidence
 
 public static class Program
 {
+    public static IReadOnlyList<BenchmarkResult> RunBenchmarks()
+    {
+        var results = new List<BenchmarkResult>();
+        results.AddRange(ProblemSet5.RunAll());
+        results.Add(ParabolaFixedPointBenchmark.Run());
+        results.AddRange(HighSchoolConicBenchmarks.RunAll());
+        results.AddRange(ProjectiveBenchmarks.RunAll());
+        results.AddRange(CoverageBenchmarks.RunAll());
+
+        var failed = results.Count(r => !r.Passed);
+        Console.WriteLine(
+            $"\n================ 基准总汇总：{results.Count - failed}/{results.Count} 通过，{failed} 失败 ================");
+        return results;
+    }
+
     public static void Main(string[] args)
     {
         if (Array.IndexOf(args, "--benchmark") >= 0)
         {
-            Subspace.Benchmarks.ProblemSet5.RunAll();
-            Subspace.Benchmarks.ParabolaFixedPointBenchmark.Run();
-            Subspace.Benchmarks.HighSchoolConicBenchmarks.RunAll();
-            Subspace.Benchmarks.ProjectiveBenchmarks.HarmonicCrossRatio();
-            Subspace.Benchmarks.ProjectiveBenchmarks.DegeneratePascal();
-            Subspace.Benchmarks.ProjectiveBenchmarks.DegenerateBrianchon();
-            Subspace.Benchmarks.ProjectiveBenchmarks.SymbolicHarmonicCrossRatio();
-            Subspace.Benchmarks.ProjectiveBenchmarks.SymbolicDegeneratePascal();
-            Subspace.Benchmarks.ProjectiveBenchmarks.SymbolicDegenerateBrianchon();
-            Subspace.Benchmarks.ProjectiveBenchmarks.FrameInvariantHarmonicCrossRatio();
-            Subspace.Benchmarks.ProjectiveBenchmarks.FrameInvariantDegeneratePascal();
-            Subspace.Benchmarks.ProjectiveBenchmarks.FrameInvariantDegenerateBrianchon();
-            Subspace.Benchmarks.CoverageBenchmarks.RunAll();
+            var results = RunBenchmarks();
+            if (results.Any(r => !r.Passed))
+                Environment.ExitCode = 1;
             return;
         }
 

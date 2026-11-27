@@ -17,7 +17,7 @@ public static class HighSchoolConicBenchmarks
         {
             Run("HS-1", "AM⊥AN ⇒ l 过 (0,-3/5)", CheckEllipsePerpendicular),
             Run("HS-2", "焦点弦 ⇒ k_BN/k_AM=3", CheckEllipseSlopeRatio),
-            Run("HS-3", "焦点弦/准线 ⇒ 1/|FM|²+1/|FN|²=1/4", CheckParabolaFocusDirectrix),
+            Run("HS-3", "焦点弦 ⇒ 1/|FM|+1/|FN|=1", CheckParabolaFocusChord),
             Run("HS-4", "过 Q(0,-1) 的弦，P=OA+OB ⇒ x²=4(y+2), |x|>4", CheckParabolaLocus),
             Run("HS-5", "双曲线切线截渐近线面积=√3", CheckHyperbolaTangentArea),
             Run("HS-6", "双曲线 ⇒ (2k1+1)(2k2+1)=2", CheckHyperbolaSlopeProduct),
@@ -198,18 +198,19 @@ public static class HighSchoolConicBenchmarks
             : (false, "斜率恒等式未化为 2");
     }
 
-    private static (bool, string) CheckParabolaFocusDirectrix()    {
-        // y²=4x，焦点弦 x=my+1 ⇒ y1+y2=4m, y1y2=-4。
-        // 参数化 y2=-4/y1，验证 1/|FM|²+1/|FN|²=1/4。
+    private static (bool, string) CheckParabolaFocusChord()
+    {
+        // y²=4x，焦点 F=(1,0)，焦点弦 x=my+1 ⇒ y1y2=−4。
+        // 对 M=(y²/4,y)：|FM|=(y²+4)/4，故 1/|FM|=4/(y²+4)。
         var y = ExactScalar.FromSymbol("y");
         var y2 = -4 / y;
-        var sum = y * y / (4 * (y * y + 4))
-                  + y2 * y2 / (4 * (y2 * y2 + 4));
-        var diff = sum - ExactScalar.FromInt(1) / 4;
+        var invFm = ExactScalar.FromInt(4) / (y * y + ExactScalar.FromInt(4));
+        var invFn = ExactScalar.FromInt(4) / (y2 * y2 + ExactScalar.FromInt(4));
+        var diff = invFm + invFn - ExactScalar.One;
 
         return diff.VerifyStrictZero() == StrictResult.StrictlyTrue
-            ? (true, "y1y2=−4 约束下，和恒为 1/4")
-            : (false, "定值化简失败");
+            ? (true, "y1y2=−4 约束下，1/|FM|+1/|FN| 恒为 1")
+            : (false, "倒数和未化为 1");
     }
 
     private static (bool, string) CheckHyperbolaTangentArea()

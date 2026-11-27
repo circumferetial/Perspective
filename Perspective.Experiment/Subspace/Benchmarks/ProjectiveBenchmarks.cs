@@ -10,6 +10,19 @@ namespace Perspective.Experiment.Subspace.Benchmarks;
 /// </summary>
 public static class ProjectiveBenchmarks
 {
+    public static IReadOnlyList<BenchmarkResult> RunAll() =>
+    [
+        HarmonicCrossRatio(),
+        DegeneratePascal(),
+        DegenerateBrianchon(),
+        SymbolicHarmonicCrossRatio(),
+        SymbolicDegeneratePascal(),
+        SymbolicDegenerateBrianchon(),
+        FrameInvariantHarmonicCrossRatio(),
+        FrameInvariantDegeneratePascal(),
+        FrameInvariantDegenerateBrianchon()
+    ];
+
     public static BenchmarkResult HarmonicCrossRatio()
     {
         var sw = Stopwatch.StartNew();
@@ -27,7 +40,7 @@ public static class ProjectiveBenchmarks
         // 验证 A,B,U,V 共 conic y²=xz。
         bool onConic = OnParabola(u) && OnParabola(v) && OnParabola(a) && OnParabola(b) && OnParabola(p);
         if (!onConic)
-            return Fail("取点不在 y²=xz 上");
+            return Fail("PR-3", "取点不在 y²=xz 上");
 
         var uv = SubspaceAlgebra.Join(u, v);
         var x = SubspaceAlgebra.Meet(SubspaceAlgebra.Join(p, a), uv);
@@ -265,14 +278,19 @@ public static class ProjectiveBenchmarks
         var p = Primal3<ExactScalar>.Fixed(49, 7);
 
         var original = CrossRatioOnUv(u, v, a, b, p);
-        if (!original.TryGet(out _))
-            return Fail("原配置交比计算失败");
+        if (!original.TryGet(out var crOriginal)
+            || (crOriginal + ExactScalar.One).VerifyStrictZero() != StrictResult.StrictlyTrue)
+            return Fail("PR-3F", "原配置交比不为 −1");
 
         // 用 ConicFrame 把 U,V 送到 0,1；第三个参数取 4，避开 A/B/P。
         var frame = ConicFrame.FromThreeParameters(
             ExactScalar.FromInt(2),
             ExactScalar.FromInt(5),
             ExactScalar.FromInt(4)).Value;
+
+        bool frameOk = FrameMapsTo(frame, u, Primal3<ExactScalar>.Fixed(0, 0))
+                       && FrameMapsTo(frame, v, Primal3<ExactScalar>.Fixed(1, 1))
+                       && FrameSendsToInfinity(frame, ExactScalar.FromInt(4));
 
         var u2 = frame.ApplyPoint(u).Value;
         var v2 = frame.ApplyPoint(v).Value;
@@ -281,13 +299,14 @@ public static class ProjectiveBenchmarks
         var p2 = frame.ApplyPoint(p).Value;
 
         var transformed = CrossRatioOnUv(u2, v2, a2, b2, p2);
-        bool ok = transformed.TryGet(out var cr2)
+        bool ok = frameOk
+                  && transformed.TryGet(out var cr2)
                   && (cr2 + ExactScalar.One).VerifyStrictZero() == StrictResult.StrictlyTrue;
 
         sw.Stop();
         var detail = ok
-            ? "ConicFrame 归一化后 (U,V;X,Y) 仍为 −1"
-            : "归一化后交比不为 −1";
+            ? "ConicFrame 把 U,V 归一到 0,1 后，(U,V;X,Y) 仍为 −1"
+            : frameOk ? "归一化后交比不为 −1" : "ConicFrame 未把 U,V 送到 0,1";
 
         Console.WriteLine($"[PR-3F] {(ok ? "PASS" : "FAIL")}  {sw.ElapsedMilliseconds,4}ms  {detail}");
         return new BenchmarkResult("PR-3F", "(U,V;X,Y)=−1", "ConicFrame 归一化", ok, detail, sw.ElapsedMilliseconds);
@@ -307,6 +326,9 @@ public static class ProjectiveBenchmarks
             ExactScalar.FromInt(2),
             ExactScalar.FromInt(5),
             ExactScalar.FromInt(4)).Value;
+
+        bool frameOk = FrameMapsTo(frame, a, Primal3<ExactScalar>.Fixed(0, 0))
+                       && FrameMapsTo(frame, b, Primal3<ExactScalar>.Fixed(1, 1));
 
         var a2 = frame.ApplyPoint(a).Value;
         var b2 = frame.ApplyPoint(b).Value;
@@ -333,11 +355,13 @@ public static class ProjectiveBenchmarks
             SubspaceAlgebra.Join(x2, y2),
             SubspaceAlgebra.Join(a2, b2));
 
-        var ok = concurrent.TryGet(out var verdict) && verdict == StrictResult.StrictlyTrue;
+        var ok = frameOk
+                  && concurrent.TryGet(out var verdict)
+                  && verdict == StrictResult.StrictlyTrue;
         sw.Stop();
         var detail = ok
-            ? "ConicFrame 归一化后，退化 Pascal 三线仍共点"
-            : "归一化后三线不共点";
+            ? "ConicFrame 把 A,B 归一到 0,1 后，退化 Pascal 三线仍共点"
+            : frameOk ? "归一化后三线不共点" : "ConicFrame 未把 A,B 送到 0,1";
 
         Console.WriteLine($"[PR-2F] {(ok ? "PASS" : "FAIL")}  {sw.ElapsedMilliseconds,4}ms  {detail}");
         return new BenchmarkResult("PR-2F", "X1Y1、X2Y2、AB 共点", "ConicFrame + Pascal", ok, detail, sw.ElapsedMilliseconds);
@@ -362,6 +386,10 @@ public static class ProjectiveBenchmarks
             ExactScalar.FromInt(2), ExactScalar.Zero,
             ExactScalar.One, ExactScalar.One);
         var frame = second.Compose(first).Value;
+
+        bool frameOk = FrameMapsTo(frame, e, Primal3<ExactScalar>.Fixed(0, 0))
+                       && FrameMapsTo(frame, f, Primal3<ExactScalar>.Fixed(1, 1))
+                       && FrameMapsTo(frame, g, Primal3<ExactScalar>.Fixed(4, 2));
 
         var e2 = frame.ApplyPoint(e).Value;
         var f2 = frame.ApplyPoint(f).Value;
@@ -388,12 +416,13 @@ public static class ProjectiveBenchmarks
 
         var rsm = SubspaceAlgebra.AreCollinear(r, s, m);
         var rsn = SubspaceAlgebra.AreCollinear(r, s, n);
-        var ok = rsm.TryGet(out var v1) && v1 == StrictResult.StrictlyTrue
+        var ok = frameOk
+                  && rsm.TryGet(out var v1) && v1 == StrictResult.StrictlyTrue
                   && rsn.TryGet(out var v2) && v2 == StrictResult.StrictlyTrue;
         sw.Stop();
         var detail = ok
-            ? "ConicFrame 复合归一化后，R,S,M,N 仍共线"
-            : "归一化后四点不共线";
+            ? "ConicFrame 复合把 E,F,G 归一到 0,1,2 后，R,S,M,N 仍共线"
+            : frameOk ? "归一化后四点不共线" : "ConicFrame 未把 E,F,G 送到 0,1,2";
 
         Console.WriteLine($"[PR-1F] {(ok ? "PASS" : "FAIL")}  {sw.ElapsedMilliseconds,4}ms  {detail}");
         return new BenchmarkResult("PR-1F", "R,S,M,N 共线", "ConicFrame + Brianchon", ok, detail, sw.ElapsedMilliseconds);
@@ -415,6 +444,20 @@ public static class ProjectiveBenchmarks
     private static bool OnParabola(Primal3<ExactScalar> p) =>
         (p.Y * p.Y - p.X * p.W).VerifyStrictZero() == StrictResult.StrictlyTrue;
 
-    private static BenchmarkResult Fail(string detail) =>
-        new("PR-3", "(U,V;X,Y)=−1", "交比/极点", false, detail, 0);
+    private static bool FrameMapsTo(ConicFrame frame, Primal3<ExactScalar> source, Primal3<ExactScalar> target)
+    {
+        if (!frame.ApplyPoint(source).TryGet(out var image))
+            return false;
+        return SubspaceAlgebra.SameSubspace(image, target).TryGet(out var verdict)
+               && verdict == StrictResult.StrictlyTrue;
+    }
+
+    private static bool FrameSendsToInfinity(ConicFrame frame, ExactScalar parameter)
+    {
+        var applied = frame.ApplyParameter(parameter);
+        return applied.IsFailure && applied.Error == GeometryError.AtInfinity;
+    }
+
+    private static BenchmarkResult Fail(string id, string detail) =>
+        new(id, "(U,V;X,Y)=−1", "交比/极点", false, detail, 0);
 }
