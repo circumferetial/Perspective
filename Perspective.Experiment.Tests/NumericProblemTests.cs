@@ -1,0 +1,43 @@
+using Perspective.Core.Math;
+using Xunit;
+
+namespace Perspective.Experiment.Tests;
+
+public sealed class NumericProblemTests
+{
+    private static BigRational Q(long num, long den = 1) => new(num, den);
+    private static QuadScalar R(long num, long den = 1) => QuadScalar.FromLong(num) / QuadScalar.FromLong(den);
+    private static QuadScalar Sqrt(long n) => QuadScalar.FromSqrt(Q(n));
+
+    [Fact]
+    public void HS1_RationalInstance_PerpendicularCondition()
+    {
+        // x²/4+y²=1, l:y=x−3/5；用 Vieta 直接验 AM⊥AN。
+        var k = Q(1);
+        var m = Q(-3, 5);
+        var one = BigRational.One;
+        var lc = one + Q(4) * k * k;
+
+        var sum = -Q(8) * k * m / lc;
+        var product = Q(4) * (m * m - one) / lc;
+        var perpendicular = (one + k * k) * product
+                            + k * (m - one) * sum
+                            + (m - one) * (m - one);
+
+        Assert.Equal(StrictResult.StrictlyTrue,
+            BigRational.VerifyZero(perpendicular));
+    }
+
+    [Fact]
+    public void HS5_SingleSqrt_TangentArea()
+    {
+        // x²−y²/3=1, tangent y=2x+1；与渐近线 y=±√3x 的交点面积²。
+        var sqrt3 = Sqrt(3);
+        var xP = QuadScalar.One / (sqrt3 - R(2));
+        var xQ = -QuadScalar.One / (sqrt3 + R(2));
+        var areaSquared = R(3) * xP * xP * xQ * xQ;
+
+        Assert.Equal(StrictResult.StrictlyTrue,
+            QuadScalar.VerifyZero(areaSquared - R(3)));
+    }
+}

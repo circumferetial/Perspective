@@ -59,6 +59,19 @@ B：数字层不足
 C：算法层不足
 ```
 
+## 已完成实例
+
+不是“表示可行”，而是已经用新数字层算过：
+
+- **HS-1 有理实例**：\(l:y=x-\frac35\)，用 BigRational + Vieta 验证垂直条件为 0；
+- **HS-5 单根号实例**：切线 \(y=2x+1\) 截渐近线，面积² 用 QuadScalar 精确算到 3。
+
+对应测试：
+
+```text
+NumericProblemTests
+```
+
 ## 结论
 
 - **有理几何**：BigRational 已经够用；
