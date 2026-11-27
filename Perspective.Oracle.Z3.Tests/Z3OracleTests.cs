@@ -83,6 +83,19 @@ public class Z3OracleTests
     }
 
     [Fact]
+    public void TryProveZero_WithParameters()
+    {
+        var x = ExactScalar.FromSymbol("x");
+        var identity = (x + ExactScalar.FromInt(1)) * (x + ExactScalar.FromInt(1))
+                       - (x * x + ExactScalar.FromInt(2) * x + ExactScalar.FromInt(1));
+
+        Assert.Equal(StrictVerdict.StrictlyTrue,
+            Oracle.TryProveZero(identity, ["x"]));
+        Assert.Equal(StrictVerdict.StrictlyFalse,
+            Oracle.TryProveZero(x * x - ExactScalar.FromInt(1), ["x"]));
+    }
+
+    [Fact]
     public void TryZero_HandlesSquareRoots()
     {
         var sqrt2 = ExactScalar.Sqrt(ExactScalar.FromInt(2));

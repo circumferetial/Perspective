@@ -80,6 +80,24 @@ public sealed class Z3Oracle : IAlgebraicOracle, IDisposable
         };
     }
 
+    /// <summary>
+    ///     参数化恒等式：∀vars, expression=0。
+    ///     通过“是否存在 expression≠0 的反例”判定。
+    /// </summary>
+    public StrictVerdict TryProveZero(ExactScalar expression, IReadOnlyList<string> variables)
+    {
+        var verdict = DecideExists(
+            variables,
+            [new RelationStatement(RelationKind.NotEqual, expression, ExactScalar.Zero)]);
+
+        return verdict.Kind switch
+        {
+            OracleVerdictKind.Unsat => StrictVerdict.StrictlyTrue,
+            OracleVerdictKind.Sat => StrictVerdict.StrictlyFalse,
+            _ => StrictVerdict.Unknown
+        };
+    }
+
     private BoolExpr? CompileRelation(
         RelationStatement relation,
         Dictionary<string, ArithExpr> env,
