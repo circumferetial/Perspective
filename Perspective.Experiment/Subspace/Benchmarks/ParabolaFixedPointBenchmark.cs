@@ -25,6 +25,10 @@ public static class ParabolaFixedPointBenchmark
         var fixedPoint = new Primal3<PolyExpr>(two * p, PolyExpr.Zero, PolyExpr.One);
 
         var space = new UnifiedGeoSpace();
+        space.RequireNonZero(p);
+        space.RequireNonZero(a);
+        space.RequireNonZero(b);
+        space.RequireNonZero(a - b);
         space.RequireZero(a * b + PolyExpr.One); // OA ⟂ OB
 
         var incidence = SubspaceAlgebra.Pair(SubspaceAlgebra.Join(pa, pb), fixedPoint);
@@ -34,7 +38,7 @@ public static class ParabolaFixedPointBenchmark
         var ok = outcome.Status == UnifiedProofStatus.Proved;
         var detail = ok
             ? $"proved: AB 过 (2p,0)，chain={outcome.CharacteristicSet.Count}"
-            : $"status={outcome.Status}, remainder={space.Format(outcome.Remainder)}";
+            : $"status={outcome.Status}, ndg={outcome.NdgConditions.Count}, remainder={space.Format(outcome.Remainder)}";
 
         Console.WriteLine($"[P-FIX] {(ok ? "PASS" : "FAIL")}  {sw.ElapsedMilliseconds}ms  {detail}");
         return new BenchmarkResult("P-FIX", "(2p,0)", "PolyExpr + Wu", ok, detail, sw.ElapsedMilliseconds);

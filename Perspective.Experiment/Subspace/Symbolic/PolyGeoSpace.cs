@@ -473,6 +473,7 @@ public sealed class PolyExpr : IExactRing<PolyExpr>, IIntegralDomain<PolyExpr>, 
 public enum UnifiedProofStatus
 {
     Proved,
+    ProvedUnderConditions,
     NotZero,
     Inconsistent
 }
@@ -489,10 +490,11 @@ public sealed class UnifiedGeoSpace
     private readonly List<PolyExpr> _constraints = [];
     private readonly Dictionary<int, (PolyExpr Num, ExactScalar Den)> _linearSubs = [];
     private readonly List<string> _varNames = [];
+    private readonly HashSet<PolyExpr> _nonzeroWitnesses = [];
 
     public int VariableCount => _varNames.Count;
 
-    public string Format(PolyExpr p) => p.Format(id => _varNames[id]);
+    public string Format(PolyExpr p) => p.Format(id => id < _varNames.Count ? _varNames[id] : $"v{id}");
     public string Format(Primal3<PolyExpr> p) => $"[{Format(p.X)}, {Format(p.Y)}, {Format(p.W)}]";
 
     public (bool Consistent, IReadOnlyList<PolyExpr> Chain) GetCharacteristicSet()
@@ -539,6 +541,7 @@ public sealed class UnifiedGeoSpace
         if (reduced.IsConstant) return;
 
         var witness = NewSymbol($"z{VariableCount}");
+        _nonzeroWitnesses.Add(witness);
         RequireZero(witness * reduced - PolyExpr.One);
     }
 
@@ -595,9 +598,17 @@ public sealed class UnifiedGeoSpace
 
         var ndg = new List<PolyExpr>();
         var rem = ReduceByChain(target, chain, ndg);
-        return rem.IsZero
+
+        // RequireNonZero 的见证变量 z 满足 z·g−1=0，故 z≠0 已由约束保证。
+        ndg.RemoveAll(p => _nonzeroWitnesses.Contains(p));
+
+        if (!rem.IsZero)
+            return new UnifiedProofOutcome(UnifiedProofStatus.NotZero, rem, chain, ndg);
+
+        // 伪除法只证明了“在非退化初式非零时”成立；ndg 非空不能当无条件 Proved。
+        return ndg.Count == 0
             ? new UnifiedProofOutcome(UnifiedProofStatus.Proved, rem, chain, ndg)
-            : new UnifiedProofOutcome(UnifiedProofStatus.NotZero, rem, chain, ndg);
+            : new UnifiedProofOutcome(UnifiedProofStatus.ProvedUnderConditions, rem, chain, ndg);
     }
 
     private void PropagateLinearEliminations()

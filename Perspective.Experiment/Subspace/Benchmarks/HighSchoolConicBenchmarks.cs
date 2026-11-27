@@ -54,6 +54,7 @@ public static class HighSchoolConicBenchmarks
         var lc = one + 4 * k * k;
 
         var space = new UnifiedGeoSpace();
+        space.RequireNonZero(lc);
         space.RequireZero(lc * (x1 + x2) + 8 * k * m);
         space.RequireZero(lc * x1 * x2 - 4 * (m * m - one));
 
@@ -67,7 +68,7 @@ public static class HighSchoolConicBenchmarks
         var outcome = space.ProveZero(SubspaceAlgebra.Pair(target, p));
         return outcome.Status == UnifiedProofStatus.Proved
             ? (true, "定点族 m=1/2−k 下 AM∩BN 恒在 x+2y=4；定点 (1,1/2)")
-            : (false, $"status={outcome.Status}");
+            : (false, $"status={outcome.Status}, ndg={outcome.NdgConditions.Count}, ndgExpr=[{string.Join("; ", outcome.NdgConditions.Select(space.Format))}]");
     }
 
     private static (bool, string) CheckParabolaAreaRange()
