@@ -59,9 +59,9 @@ B：数字层不足
 C：算法层不足
 ```
 
-## 已完成实例
+## 数字层算术 sanity（不是算法移植）
 
-不是“表示可行”，而是已经用新数字层算过：
+以下测试只验证**数字类型运算**与手推公式，不调用完整几何算法：
 
 - **HS-1 有理实例**：\(l:y=x-\frac35\)，用 BigRational + Vieta 验证垂直条件为 0；
 - **HS-3 有理实例**：焦点弦端点 \(y_1=1,y_2=-4\)，验证 \(1/|FM|+1/|FN|=1\)；
@@ -73,6 +73,21 @@ C：算法层不足
 
 ```text
 NumericProblemTests
+```
+
+## 真正调用算法的测试
+
+- `AlgorithmPipelineTests.HS3_ConicIntersection_FocusChord`：
+  调用 `ConicIntersection.Intersect` 求 \(y^2=4x\) 与 \(x=1\) 的交点，再算焦点距离倒数和。
+- `BigRationalGeometryTests` / `QuadScalarGeometryTests`：
+  调用 `Join` / `Meet` / `Det` / `Eval` 等几何原语。
+
+所以当前准确说法是：
+
+```text
+数字算术 sanity：5 项
+调用几何原语：BigRational/QuadScalar 若干
+完整题目算法管线：1 项（HS-3 的 ConicIntersection 实例）
 ```
 
 ## 结论
