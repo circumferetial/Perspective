@@ -40,6 +40,16 @@
 - 已验证：构造已知退化成员 λ=1 的 pencil；
 - **尚未**做退化 conic 的直线分解与交点构造。
 
+### RCF 动态几何
+
+`Perspective.Experiment.Z3/RcfGeometry.cs`
+
+- `RcfPoint` / `RcfLine` / `RcfConic`；
+- `Join` / `Meet` / `Pair` / `Eval` / `Polar`；
+- `Intersect(line, conic)`：RCF 精确交点；
+- `Circle(center, radiusSquared)`：用交点继续构造圆；
+- 已验证：单位圆 ∩ y=1/2 → 两个 RCF 点 → 以交点为圆心构造新圆。
+
 ### Z3 oracle
 
 `Perspective.Oracle.Z3/Z3Oracle.cs`

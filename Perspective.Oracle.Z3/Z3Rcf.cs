@@ -37,6 +37,12 @@ public sealed class Z3RcfContext : IDisposable
     public RcfNum Neg(RcfNum a) =>
         new(this, Z3RcfNative.Z3_rcf_neg(_context, a.Handle));
 
+    public RcfNum Inverse(RcfNum a) =>
+        new(this, Z3RcfNative.Z3_rcf_inv(_context, a.Handle));
+
+    public RcfNum Div(RcfNum a, RcfNum b) =>
+        new(this, Z3RcfNative.Z3_rcf_div(_context, a.Handle, b.Handle));
+
     /// <summary>正平方根；负数返回失败。</summary>
     public bool TrySqrt(RcfNum value, out RcfNum root)
     {
@@ -157,6 +163,28 @@ public sealed class RcfNum : IDisposable
 
     internal IntPtr Handle { get; private set; }
 
+    public Z3RcfContext Context => _owner;
+
+    public RcfNum Add(RcfNum other) => _owner.Add(this, other);
+    public RcfNum Sub(RcfNum other) => _owner.Sub(this, other);
+    public RcfNum Mul(RcfNum other) => _owner.Mul(this, other);
+    public RcfNum Div(RcfNum other) => _owner.Div(this, other);
+    public RcfNum Neg() => _owner.Neg(this);
+    public int Sign() => _owner.Sign(this);
+
+    public RcfNum Sqrt()
+    {
+        if (!_owner.TrySqrt(this, out var root))
+            throw new InvalidOperationException("RCF 负数不能开实平方根。");
+        return root;
+    }
+
+    public static RcfNum operator +(RcfNum a, RcfNum b) => a.Add(b);
+    public static RcfNum operator -(RcfNum a, RcfNum b) => a.Sub(b);
+    public static RcfNum operator *(RcfNum a, RcfNum b) => a.Mul(b);
+    public static RcfNum operator /(RcfNum a, RcfNum b) => a.Div(b);
+    public static RcfNum operator -(RcfNum a) => a.Neg();
+
     public void Dispose()
     {
         if (Handle == IntPtr.Zero) return;
@@ -198,6 +226,12 @@ internal static partial class Z3RcfNative
 
     [LibraryImport(Library)]
     internal static partial IntPtr Z3_rcf_neg(IntPtr context, IntPtr a);
+
+    [LibraryImport(Library)]
+    internal static partial IntPtr Z3_rcf_inv(IntPtr context, IntPtr a);
+
+    [LibraryImport(Library)]
+    internal static partial IntPtr Z3_rcf_div(IntPtr context, IntPtr a, IntPtr b);
 
     [LibraryImport(Library)]
     internal static unsafe partial uint Z3_rcf_mk_roots(
