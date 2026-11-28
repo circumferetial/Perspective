@@ -83,6 +83,34 @@ public class Z3OracleTests
     }
 
     [Fact]
+    public void Rcf_SqrtNested_IsExact()
+    {
+        using var ctx = new Z3RcfContext();
+        using var one = ctx.FromInt(1);
+        using var two = ctx.FromInt(2);
+
+        var sqrt2 = Sqrt(ctx, two);
+        using var _sqrt2 = sqrt2;
+        using var onePlusSqrt2 = ctx.Add(one, sqrt2);
+
+        var x = Sqrt(ctx, onePlusSqrt2);
+        using var _x = x;
+        using var x2 = ctx.Mul(x, x);
+        using var diff = ctx.Sub(x2, onePlusSqrt2);
+        Assert.Equal(0, ctx.Sign(diff));
+
+        using var minusThreeHalves = ctx.Rational("-3/2");
+        using var sum = ctx.Add(x, minusThreeHalves);
+        Assert.Equal(1, ctx.Sign(sum));
+    }
+
+    private static RcfNum Sqrt(Z3RcfContext context, RcfNum value)
+    {
+        Assert.True(context.TrySqrt(value, out var root));
+        return root;
+    }
+
+    [Fact]
     public void TryProveZero_WithParameters()
     {
         var x = ExactScalar.FromSymbol("x");
