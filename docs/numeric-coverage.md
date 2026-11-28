@@ -77,6 +77,10 @@ NumericProblemTests
 
 ## 真正调用算法的测试
 
+- `GenericConicLineTests`：
+  - `BigRational`：\(y^2=4x\) 与 \(x=1\) 的实际直线∩conic；
+  - `QuadScalar`：单位圆与 \(y=1/2\) 的实际交点；
+  - `BigRational` 非平方判别式 → `Unsupported`，不抛异常。
 - `AlgorithmPipelineTests.HS3_ConicIntersection_FocusChord`：
   调用 `ConicIntersection.Intersect` 求 \(y^2=4x\) 与 \(x=1\) 的交点，再算焦点距离倒数和。
 - `BigRationalGeometryTests` / `QuadScalarGeometryTests`：
@@ -87,7 +91,8 @@ NumericProblemTests
 ```text
 数字算术 sanity：5 项
 调用几何原语：BigRational/QuadScalar 若干
-完整题目算法管线：1 项（HS-3 的 ConicIntersection 实例）
+完整题目的算法管线：HS-3（ExactScalar）
+GenericConicLine 算法：BigRational/QuadScalar 两条真实路径
 ```
 
 ## 结论

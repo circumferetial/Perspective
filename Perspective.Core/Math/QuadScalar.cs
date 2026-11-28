@@ -11,6 +11,7 @@ public readonly struct QuadScalar :
     IExactRing<QuadScalar>,
     IComputableField<QuadScalar>,
     IOrderedRing<QuadScalar>,
+    ISqrtable<QuadScalar>,
     IComparable<QuadScalar>
 {
     public BigRational A { get; }
@@ -177,6 +178,24 @@ public readonly struct QuadScalar :
     }
 
     public int CompareTo(QuadScalar other) => SignOf(this - other);
+
+    static StrictVerdict ISqrtable<QuadScalar>.TrySqrt(QuadScalar value, out QuadScalar root)
+    {
+        if (!value.B.IsZero)
+        {
+            root = default;
+            return StrictVerdict.Unknown;
+        }
+
+        if (value.A.Num.Sign < 0)
+        {
+            root = default;
+            return StrictVerdict.StrictlyFalse;
+        }
+
+        root = FromSqrt(value.A);
+        return StrictVerdict.StrictlyTrue;
+    }
 
     public override string ToString() =>
         B.IsZero ? A.ToString() : $"{A} + ({B})√{Radicand}";

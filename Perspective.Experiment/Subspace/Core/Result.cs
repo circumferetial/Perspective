@@ -12,7 +12,8 @@ public enum GeometryError
     LineContainedInConic,
     DegenerateLine,
     UndefinedParameter,
-    CollinearPoints
+    CollinearPoints,
+    Unsupported
 }
 
 /// <summary>
