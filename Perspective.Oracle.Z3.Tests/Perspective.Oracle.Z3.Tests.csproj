@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Perspective.Core\Perspective.Core.csproj" />
     <ProjectReference Include="..\Perspective.Oracle.Z3\Perspective.Oracle.Z3.csproj" />
+    <ProjectReference Include="..\Perspective.Experiment.Z3\Perspective.Experiment.Z3.csproj" />
   </ItemGroup>
 
 </Project>

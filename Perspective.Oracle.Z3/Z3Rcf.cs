@@ -105,6 +105,32 @@ public sealed class Z3RcfContext : IDisposable
         return sign;
     }
 
+    /// <summary>求一元多项式的全部实根；系数按升序。</summary>
+    public IReadOnlyList<RcfNum> FindRealRoots(IReadOnlyList<RcfNum> coefficients)
+    {
+        if (coefficients.Count == 0)
+            return [];
+
+        var handles = coefficients.Select(c => c.Handle).ToArray();
+        var roots = new IntPtr[handles.Length];
+
+        uint count;
+        unsafe
+        {
+            fixed (IntPtr* pCoeffs = handles)
+            fixed (IntPtr* pRoots = roots)
+            {
+                count = Z3RcfNative.Z3_rcf_mk_roots(
+                    _context, (uint)handles.Length, pCoeffs, pRoots);
+            }
+        }
+
+        var result = new List<RcfNum>((int)count);
+        for (var i = 0; i < count; i++)
+            result.Add(new RcfNum(this, roots[i]));
+        return result;
+    }
+
     public string ToDecimal(RcfNum value, uint precision)
     {
         var ptr = Z3RcfNative.Z3_rcf_num_to_decimal_string(_context, value.Handle, precision);

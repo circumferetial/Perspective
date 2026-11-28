@@ -31,6 +31,15 @@
 - 已验证 `sqrt(1+sqrt2)`、`x²-(1+sqrt2)=0`、符号比较；
 - 依赖原生 `libz3`（MIT），不引用托管 `Microsoft.Z3.dll`。
 
+### ConicPencil（起步）
+
+`Perspective.Experiment.Z3/ConicPencil.cs`
+
+- 计算 `det(Q1+λQ2)` 的升序系数；
+- 用 Z3 RCF 找退化成员 λ；
+- 已验证：构造已知退化成员 λ=1 的 pencil；
+- **尚未**做退化 conic 的直线分解与交点构造。
+
 ### Z3 oracle
 
 `Perspective.Oracle.Z3/Z3Oracle.cs`

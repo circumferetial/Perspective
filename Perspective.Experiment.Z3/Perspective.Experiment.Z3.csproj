@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Perspective.Core\Perspective.Core.csproj" />
+    <ProjectReference Include="..\Perspective.Experiment\Perspective.Experiment.csproj" />
+    <ProjectReference Include="..\Perspective.Oracle.Z3\Perspective.Oracle.Z3.csproj" />
+  </ItemGroup>
+
+</Project>
