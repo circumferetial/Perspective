@@ -18,8 +18,18 @@
 - `a + b√d`，单个二次扩张；
 - `FromSqrt(BigRational)` 做平方因子分解；
 - 精确零/符号/逆；
-- 不同 `d` 的混合会抛 `NotSupportedException`，表示超出片段；
-- 不实现一般 `TrySqrt`（域内不一定闭合）。
+- `TrySqrt` 只对**有理元件**（`b=0`）构造根；`b≠0` 返回 `Unknown`；
+- 不同 `d` 的混合会抛 `NotSupportedException`，表示超出片段。
+
+### Z3 RCF
+
+`Perspective.Oracle.Z3/Z3Rcf.cs`
+
+- 直接 `[LibraryImport("libz3")]` 调 `Z3_rcf_*`；
+- 精确构造/比较实代数数；
+- `sqrt` 用 `Z3_rcf_mk_roots`（`x²-a` 取正根）；
+- 已验证 `sqrt(1+sqrt2)`、`x²-(1+sqrt2)=0`、符号比较；
+- 依赖原生 `libz3`（MIT），不引用托管 `Microsoft.Z3.dll`。
 
 ### Z3 oracle
 
@@ -45,14 +55,36 @@
 4. `QuadScalar` 是快路径，不是准入门槛；
 5. Z3 能判“零/存在”，不等于能直接构造精确点；构造仍需代数表示或根隔离。
 
-## 未实现
+## 明确暂缓
 
-- `RealAlgebraic`（根隔离/Sturm）；
-- FLINT/CGAL 胶水；
-- Z3 fallback 在几何层的统一接线。
+### 纯 C# BFMSS / CORE::Expr 复刻
+
+- 估计不是 500~800 行可 production 的规模；
+- 难点是表达式 DAG、根分离界、精度下界、多根号；
+- 只在“禁止原生依赖”或“Z3 RCF 性能不可接受”时再评估。
+
+### 纯 C# Sturm / Resultant / RealAlgebraic
+
+- 1000~1500 行是乐观估计；
+- 结式、Sturm、隔离区间、退化情况都很重；
+- 当前没有必须自研的触发条件。
+
+### 多根号塔 / RadicalTower
+
+- 深度 2 可做，但收益有限；
+- 先让 `QuadScalar` + Z3 RCF 覆盖；
+- 不因“未来可能有”先造通用塔。
+
+## 当前优先级
+
+1. **收口 soundness**：`ExactReal` 边界、Z3 RCF adapter、禁止 Approx 进入证明；
+2. **Conic pencil**：用“直线 + conic”表示 conic–conic 交点，避免展开四次根；
+3. **真实算法测试**：测 `GenericConicLine`/`ConicPencil`，不测手算恒等式；
+4. 数值类型只在有明确题目需要时扩展。
 
 ## 下一步
 
-1. 用 `QuadScalar` 做单根号 conic 特征/交点；
-2. 选一个几何 fallback 点接 `TryProveZero`；
-3. 再评估是否需要 `RealAlgebraic`。
+1. 做 `ExactReal` 抽象，把 `BigRational`/`QuadScalar`/`Z3Rcf` 统一；
+2. 用 `Z3Rcf` 跑通一个多根号交点；
+3. 设计 `ConicPencil`，不展开四次根；
+4. 区间过滤必须是严格外扩，不能用 `double` 四舍五入冒充。
